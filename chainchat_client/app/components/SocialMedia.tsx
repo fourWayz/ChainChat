@@ -143,6 +143,7 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
   const fetchRegisteredUser = async () => {
     if (!signer || !aaAddress) return;
     try {
+      console.log(aaAddress,'chc')
         const user = await getUserByAddress(signer,aaAddress);
         console.log(user)
         if (user) {
@@ -159,9 +160,16 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
       setMessage('Registering, please wait!');
       const transaction = await registerUser(signer,username)
       console.log(transaction.transactionHash);
-      setMessage('User registered successfully.');
-      setUsername('');
-      fetchRegisteredUser()
+      if(transaction.transactionHash){
+        setMessage('User registered successfully.');
+        setUsername('');
+        fetchRegisteredUser()
+
+      }
+      else{
+        setMessage('Error registering.');
+      }
+      
 
     } catch (error :any) {
       console.error(error);
@@ -255,7 +263,7 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
 
   const handleAddComment = (postId :number) => {
     const comment = commentText[postId];
-    addComment(signer!,postId, comment);
+    add_comment(postId, comment);
     setCommentText(prevState => ({ ...prevState, [postId]: '' }));
   };
 
@@ -312,7 +320,7 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
       <Navbar.Toggle aria-controls="basic-navbar-nav" className="ms-2" />
       <Navbar.Collapse id="basic-navbar-nav">
         <Nav className="ms-3">
-          {registeredUser && (
+          {/* {registeredUser && (
             <Nav.Item>
               <Button variant="warning" disabled>
                 {profileImageURL && (
@@ -324,10 +332,9 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
                     height={30}
                   />
                 )}
-                {aaAddress.slice(0, 6)}
               </Button>
             </Nav.Item>
-          )}
+          )} */}
         </Nav>
       </Navbar.Collapse>
     </div>
