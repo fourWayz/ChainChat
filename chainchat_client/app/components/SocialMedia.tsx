@@ -8,6 +8,7 @@ import Particles from "react-tsparticles";
 import { loadSlim } from "tsparticles-slim";
 import type { Engine, ISourceOptions } from "tsparticles-engine"; 
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {  toast } from 'react-toastify';
 import { getSupportedTokens, initAAClient,createPost,
@@ -43,11 +44,14 @@ function SocialMedia() {
   const [supportedTokens, setSupportedTokens] = useState<Array<any>>([]);
   const [isFetchingTokens, setIsFetchingTokens] = useState(false);
 
+  const router = useRouter()
   const particlesInit = async (engine: Engine) => {
     await loadSlim(engine); // Load tsparticles-slim
   };
   
   useEffect(() => {
+    setIsLoading(true);
+
     const loadTokens = async () => {
       // Only run if signer is defined
       if (signer) {
@@ -76,9 +80,8 @@ function SocialMedia() {
     };
 
     loadTokens();
-    setIsLoading(false);
-    fetchPosts()
     fetchRegisteredUser()
+    fetchPosts()
   }, [signer]);
 
   const fetchSupportedTokens = async () => {
@@ -116,6 +119,7 @@ function SocialMedia() {
 * Handle wallet connection - important to get a real signer!
 */
 const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
+  setIsLoading(true)
   try {
     // Get the real signer from the wallet - don't use mock signers!
     const realSigner = await getSigner();
@@ -125,6 +129,7 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
     setSigner(realSigner);
 
     toast.success('Wallet connected successfully!');
+
   } catch (error) {
     console.error("Error getting signer:", error);
     toast.error('Failed to get wallet signer. Please try again.');
@@ -141,6 +146,8 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
   };
 
   const fetchRegisteredUser = async () => {
+    setIsLoading(true)
+
     if (!signer || !aaAddress) return;
     try {
       console.log(aaAddress,'chc')
@@ -148,8 +155,12 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
         console.log(user)
         if (user) {
           setRegisteredUser(user);
+          setIsLoading(false)
+
         }
     } catch (error) {
+    setIsLoading(false)
+
       console.error(error);
     }
   };
@@ -162,8 +173,11 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
       console.log(transaction.transactionHash);
       if(transaction.transactionHash){
         setMessage('User registered successfully.');
-        setUsername('');
         fetchRegisteredUser()
+        setTimeout(()=>{
+          setUsername('');
+          window.location.reload()
+        },3000)
 
       }
       else{
@@ -184,18 +198,22 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
       const transaction = await createPost(signer,content)
       if (transaction.transactionHash) {
         setMessage('Post created successfully!');
+        await fetchPosts();
         setTimeout(() => {
           setMessage('');
           setContent('');
+          window.location.reload()
         }, 3000);
-        getPosts();
+        
       } else {
         setMessage('Error creating post');
         setTimeout(() => {
-          setMessage('');
-        }, 2000);
+          setMessage('');        
+        }, 3000);
       }
-    } catch (error) {
+    } catch (error :any) {
+      setMessage(error.message);
+
       console.error(error);
     }
   };
@@ -206,10 +224,11 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
       setMessage('Liking post, please wait!');
       await likePost(signer,postId)
       setMessage('Post liked successfully.');
-      await getPosts();
+      await fetchPosts();
       setTimeout(() => {
         setMessage('');
         setContent('');
+        window.location.reload()
       }, 3000);
     } catch (error :any) {
       console.error(error);
@@ -223,11 +242,12 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
       setMessage('Adding comment, please wait!');
       await addComment(signer,postId,comment)
       setMessage('Comment added successfully.');
-      getPosts();
+      await getPosts();
 
       setTimeout(() => {
         setMessage('');
         setContent('');
+        window.location.reload()
       }, 3000);
     } catch (error :any) {
       console.error(error);
@@ -268,7 +288,7 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
   };
 
 
-  const particlesOptions: ISourceOptions = {  // Use ISourceOptions for config
+  const particlesOptions: ISourceOptions = {  
     background: {
       color: "#ffffff",
     },
@@ -380,7 +400,7 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
                         placeholder="Content"
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
-                        style={{ backgroundColor: "#0B132B", color: "#c8c8c" }}
+                        style={{ backgroundColor: "#0B132B", color: "white" }}
                       />
                       <Button variant="primary" onClick={create_post} disabled={isLoading} className="mt-2">
                         {isLoading ? <Spinner animation="border" size="sm" /> : 'Create Post'}
