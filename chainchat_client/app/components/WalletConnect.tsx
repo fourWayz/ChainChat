@@ -133,7 +133,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({ onWalletConnected }) => {
 
   return (
     <div className="wallet-container">
-      <h2>Account Abstraction Wallet</h2>
+      {/* <h2>Account Abstraction Wallet</h2> */}
       
       {error && (
         <div className="error-message">

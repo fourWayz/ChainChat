@@ -5,6 +5,8 @@ import { ethers } from "ethers";
 import { Container, Navbar, Nav, Card, Button, Form, Alert, Row, Col, Spinner, Modal } from "react-bootstrap";
 import { FaThumbsUp, FaCommentDots, FaLink } from "react-icons/fa";
 import Particles from "react-tsparticles";
+import { loadSlim } from "tsparticles-slim";
+import type { Engine, ISourceOptions } from "tsparticles-engine"; 
 import { motion } from "framer-motion";
 import Image from "next/image";
 import {  toast } from 'react-toastify';
@@ -41,6 +43,10 @@ function SocialMedia() {
   const [supportedTokens, setSupportedTokens] = useState<Array<any>>([]);
   const [isFetchingTokens, setIsFetchingTokens] = useState(false);
 
+  const particlesInit = async (engine: Engine) => {
+    await loadSlim(engine); // Load tsparticles-slim
+  };
+  
   useEffect(() => {
     const loadTokens = async () => {
       // Only run if signer is defined
@@ -254,82 +260,29 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
   };
 
 
-
-  const particlesOptions = {
+  const particlesOptions: ISourceOptions = {  // Use ISourceOptions for config
     background: {
-      color: {
-        value: "#ffffff",
-      },
+      color: "#ffffff",
     },
     fpsLimit: 60,
     interactivity: {
-      detectsOn: "canvas",
       events: {
-        onClick: {
-          enable: true,
-          mode: "push",
-        },
-        onHover: {
-          enable: true,
-          mode: "repulse",
-        },
-        resize: true,
+        onClick: { enable: true, mode: "push" },
+        onHover: { enable: true, mode: "repulse" },
       },
       modes: {
-        bubble: {
-          distance: 400,
-          duration: 2,
-          opacity: 0.8,
-          size: 40,
-        },
-        push: {
-          quantity: 4,
-        },
-        repulse: {
-          distance: 200,
-          duration: 0.4,
-        },
+        push: { quantity: 4 },
+        repulse: { distance: 200 },
       },
     },
     particles: {
-      color: {
-        value: "#ff0000",
-      },
-      links: {
-        color: "#ffffff",
-        distance: 150,
-        enable: true,
-        opacity: 0.5,
-        width: 1,
-      },
-      collisions: {
-        enable: true,
-      },
-      move: {
-        direction: "none",
-        enable: true,
-        outMode: "bounce",
-        random: false,
-        speed: 6,
-        straight: false,
-      },
-      number: {
-        density: {
-          enable: true,
-          value_area: 800,
-        },
-        value: 80,
-      },
-      opacity: {
-        value: 0.5,
-      },
-      shape: {
-        type: "circle",
-      },
-      size: {
-        random: true,
-        value: 5,
-      },
+      color: { value: "#ff0000" },
+      links: { color: "#ffffff", distance: 150, opacity: 0.5, width: 1 },
+      move: { enable: true, speed: 6, direction: "none" },
+      number: { value: 80, density: { enable: true, value_area: 800 } },
+      opacity: { value: 0.5 },
+      shape: { type: "circle" },
+      size: { value: 5, random: true },
     },
     detectRetina: true,
   };
@@ -339,39 +292,48 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
   return (
     <div>
       <Particles
-        id="tsparticles"
-        options={particlesOptions}
+       id="tsparticles"
+       init={particlesInit}
+       options={particlesOptions} 
         style={{ position: "absolute", zIndex: -1, width: "100%", height: "100%" }}
       />
-      <Container className="mt-5" style={{ backgroundColor: "#36394" }}>
-        <Navbar bg="dark" expand="lg">
-          <Container>
-            <Navbar.Brand href="#" className="text-white">Chain Chat</Navbar.Brand>
-            <WalletConnect onWalletConnected={handleWalletConnected} />
-            <Navbar.Toggle aria-controls="basic-navbar-nav" />
-            <Navbar.Collapse id="basic-navbar-nav">
-              <Nav className="me-auto">
-                {registeredUser && (
-                  <Nav.Item>
-                    <Button variant="warning" disabled>
-                      {profileImageURL && (
-                        <Image
-                          src={profileImageURL}
-                          alt="Profile Image"
-                          className="rounded-circle"
-                          width={30}
-                          height={30}
-                        />
-                      )}
-                      {' '}
-                      {aaAddress.slice(0, 6)}
-                    </Button>
-                  </Nav.Item>
+      <Container className="mt-5"  style={{ backgroundColor: "#36394" }}>
+      <Navbar style={{ backgroundColor: "rgb(0 0 0 / 14%)" }} expand="lg" className="rounded">
+  <Container className="d-flex justify-content-between align-items-center">
+    <div className="d-flex align-items-center">
+      <Navbar.Brand href="#" className=" fw-bolder fs-4" style={{color : 'gray'}}>
+        🧠 Chain Chat
+      </Navbar.Brand>
+    </div>
+
+    <div className="d-flex align-items-center">
+      <WalletConnect onWalletConnected={handleWalletConnected} />
+
+      <Navbar.Toggle aria-controls="basic-navbar-nav" className="ms-2" />
+      <Navbar.Collapse id="basic-navbar-nav">
+        <Nav className="ms-3">
+          {registeredUser && (
+            <Nav.Item>
+              <Button variant="warning" disabled>
+                {profileImageURL && (
+                  <Image
+                    src={profileImageURL}
+                    alt="Profile"
+                    className="rounded-circle me-2"
+                    width={30}
+                    height={30}
+                  />
                 )}
-              </Nav>
-            </Navbar.Collapse>
-          </Container>
-        </Navbar>
+                {aaAddress.slice(0, 6)}
+              </Button>
+            </Nav.Item>
+          )}
+        </Nav>
+      </Navbar.Collapse>
+    </div>
+  </Container>
+</Navbar>
+
 
         {!registeredUser && (
           <Row className="mt-3">
