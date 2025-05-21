@@ -20,6 +20,11 @@ import { getSupportedTokens, initAAClient,createPost,
   getComment,
   getUserByAddress} from '@/utils/aautils';
 import WalletConnect from "./WalletConnect";
+import ParticleBackground from "@/app/components/ParticleBackground";
+import NavBar from "@/app/components/NavBar";
+import PostCard from "@/app/components/PostCard";
+import RegisterForm from "@/app/components/RegisterForm";
+import CreatePost from "@/app/components/CreatePost";
 
 
 
@@ -317,155 +322,54 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
 
  
 
-  return (
-    <div>
-      <Particles
-       id="tsparticles"
-       init={particlesInit}
-       options={particlesOptions} 
-        style={{ position: "absolute", zIndex: -1, width: "100%", height: "100%" }}
-      />
-      <Container className="mt-5"  style={{ backgroundColor: "#36394" }}>
-      <Navbar style={{ backgroundColor: "rgb(0 0 0 / 14%)" }} expand="lg" className="rounded">
-  <Container className="d-flex justify-content-between align-items-center">
-    <div className="d-flex align-items-center">
-      <Navbar.Brand href="#" className=" fw-bolder fs-4" style={{color : 'gray'}}>
-        🧠 Chain Chat
-      </Navbar.Brand>
-    </div>
+ return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
+      <ParticleBackground />
+      <NavBar onWalletConnected={handleWalletConnected} />
 
-    <div className="d-flex align-items-center">
-      <WalletConnect onWalletConnected={handleWalletConnected} />
-
-      <Navbar.Toggle aria-controls="basic-navbar-nav" className="ms-2" />
-      <Navbar.Collapse id="basic-navbar-nav">
-        <Nav className="ms-3">
-          {/* {registeredUser && (
-            <Nav.Item>
-              <Button variant="warning" disabled>
-                {profileImageURL && (
-                  <Image
-                    src={profileImageURL}
-                    alt="Profile"
-                    className="rounded-circle me-2"
-                    width={30}
-                    height={30}
-                  />
-                )}
-              </Button>
-            </Nav.Item>
-          )} */}
-        </Nav>
-      </Navbar.Collapse>
-    </div>
-  </Container>
-</Navbar>
-
-
-        {!registeredUser && (
-          <Row className="mt-3">
-            <Col md={6}>
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1 }}>
-                <Card style={{ backgroundColor: "#1C2541" }}>
-                  <Card.Body>
-                    <Card.Title className="text-white">Register</Card.Title>
-                    <Form.Control
-                      type="text"
-                      placeholder="Username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                    />
-                    <Button variant="primary" onClick={register_user} disabled={isLoading} className="mt-2">
-                      {isLoading ? <Spinner animation="border" size="sm" /> : 'Register'}
-                    </Button>
-                  </Card.Body>
-                </Card>
-              </motion.div>
-            </Col>
-          </Row>
-        )}
-
-        {registeredUser && (
+      <main className="pt-24 pb-12 px-4 max-w-4xl mx-auto">
+        {!registeredUser ? (
+          <RegisterForm 
+            username={username} 
+            setUsername={setUsername} 
+            registerUser={register_user} 
+            isLoading={isLoading} 
+          />
+        ) : (
           <>
+            <CreatePost 
+              content={content} 
+              setContent={setContent} 
+              createPost={create_post} 
+              isLoading={isLoading} 
+            />
 
-            <Row className="mt-3">
-              <Col md={6}>
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1 }}>
-                  <Card style={{ backgroundColor: "#1C2541" }}>
-                    <Card.Body>
-                      <Card.Title className="text-white">Create Post</Card.Title>
-                      <Form.Control         
-                        as="textarea"
-                        rows={3}
-                        placeholder="Content"
-                        value={content}
-                        onChange={(e) => setContent(e.target.value)}
-                        style={{ backgroundColor: "#0B132B", color: "white" }}
-                      />
-                      <Button variant="primary" onClick={create_post} disabled={isLoading} className="mt-2">
-                        {isLoading ? <Spinner animation="border" size="sm" /> : 'Create Post'}
-                      </Button>
-                    </Card.Body>
-                  </Card>
-                </motion.div>
-              </Col>
-            </Row>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="mt-8"
+            >
+              <h2 className="text-3xl font-bold text-white mb-6">Latest Posts</h2>
+              
+              <div className="space-y-6">
+                {posts.map((post:any, index:any) => (
+                  <PostCard
+                    key={index}
+                    post={{ ...post, id: index }}
+                    onLike={like_post}
+                    onComment={add_comment}
+                    isRegistered={!!registeredUser}
+                  />
+                ))}
+              </div>
+            </motion.div>
           </>
         )}
-
-        <div className="mt-3">
-          {message && <Alert variant="info">{message}</Alert>}
-          <h3 className="text-white">Posts</h3>
-          <Row>
-            {posts.map((post :any, index :any) => (
-              <Col md={6} key={index}>
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1 }}>
-                  <Card className="shadow p-2 mb-3" style={{ backgroundColor: "#1C2541" }}>
-                    <Card.Body>
-                      <Card.Title style={{ color: 'darkgrey' }}>Author: {post[0]}</Card.Title>
-                      <Card.Text style={{ color: 'darkgrey' }}>{post[1]}</Card.Text>
-                      <Card.Text style={{ color: 'darkgrey' }}>Likes: {post[3]?.toString()}</Card.Text>
-
-                      {registeredUser && (
-                        <>
-                          <Button variant="primary" onClick={() => like_post(index)} className="m-2">
-                            <FaThumbsUp /> Like
-                          </Button>
-                          <Form.Control
-                            type="text"
-                            placeholder="Add a comment..."
-                            value={commentText[index] || ''}
-                            onChange={(e) => handleCommentChange(index, e.target.value)}
-                            className="m-2"
-                          />
-                          <Button variant="secondary" onClick={() => handleAddComment(index)}>
-                            <FaCommentDots /> Comment
-                          </Button>
-                        </>
-                      )}
-
-                      <div className="mt-3">
-                        <h5>Comments</h5>
-                        {post.comments.map((comment:any, commentIndex:any) => (
-                          <p key={commentIndex} className="text-info">
-                            {comment.content} <br />
-                            <span className="text-primary">
-                              {`${comment.commenter.slice(0, 6)}...${comment.commenter.slice(comment.commenter.length - 4)}`}
-                            </span>
-                          </p>
-                        ))}
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </motion.div>
-              </Col>
-            ))}
-          </Row>
-        </div>
-        
-      </Container>
+      </main>
     </div>
   );
-}
+};
+
 
 export default SocialMedia;
