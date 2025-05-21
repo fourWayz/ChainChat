@@ -2,7 +2,10 @@
 import { motion } from "framer-motion";
 import WalletConnect from "./WalletConnect";
 
-const NavBar = ({ onWalletConnected }: { onWalletConnected: (eoaAddr: string, aaAddr: string) => void }) => {
+interface NavBarProps {
+  children?: React.ReactNode;
+}
+const NavBar: React.FC<NavBarProps> = ({ children }) => {
   return (
     <motion.nav
       initial={{ y: -100 }}
@@ -20,7 +23,7 @@ const NavBar = ({ onWalletConnected }: { onWalletConnected: (eoaAddr: string, aa
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <WalletConnect onWalletConnected={onWalletConnected} />
+           {children}
           </div>
         </div>
       </div>

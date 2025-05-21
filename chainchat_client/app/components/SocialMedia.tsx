@@ -1,375 +1,306 @@
-"use client"
+"use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { ethers } from "ethers";
-import { Container, Navbar, Nav, Card, Button, Form, Alert, Row, Col, Spinner, Modal } from "react-bootstrap";
-import { FaThumbsUp, FaCommentDots, FaLink } from "react-icons/fa";
-import Particles from "react-tsparticles";
-import { loadSlim } from "tsparticles-slim";
-import type { Engine, ISourceOptions } from "tsparticles-engine"; 
-import { motion } from "framer-motion";
-import { useRouter } from "next/navigation";
-import Image from "next/image";
-import {  toast } from 'react-toastify';
-import { getSupportedTokens, initAAClient,createPost,
-  initAABuilder,getSigner,registerUser, 
+import { motion, AnimatePresence } from "framer-motion";
+import { ToastContainer } from "react-toastify";
+import 'react-toastify/dist/ReactToastify.css';
+
+// Components
+import ParticleBackground from "@/app/components/ParticleBackground";
+import NavBar from "@/app/components/NavBar";
+import WalletConnect from "@/app/components/WalletConnect";
+import RegisterForm from "@/app/components/RegisterForm";
+import CreatePost from "@/app/components/CreatePost";
+import PostCard from "@/app/components/PostCard";
+import UserProfile from "@/app/components/UserProfile";
+import FloatingActionButton from "@/app/components/FloatingActionButton";
+
+// Utils
+import {
+  getSupportedTokens,
+  initAAClient,
+  createPost,
+  initAABuilder,
+  getSigner,
+  registerUser,
   likePost,
   addComment,
   getPostsCount,
   getPost,
   getComment,
-  getUserByAddress} from '@/utils/aautils';
-import WalletConnect from "./WalletConnect";
-import ParticleBackground from "@/app/components/ParticleBackground";
-import NavBar from "@/app/components/NavBar";
-import PostCard from "@/app/components/PostCard";
-import RegisterForm from "@/app/components/RegisterForm";
-import CreatePost from "@/app/components/CreatePost";
+  getUserByAddress,
+  getAAWalletAddress
+} from '@/utils/aautils';
 
-
-
-function SocialMedia() {
+export default function SocialMediaApp() {
   const [username, setUsername] = useState('');
-  const [account, setAccount] = useState('');
   const [content, setContent] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [message, setMessage] = useState('');
   const [posts, setPosts] = useState<any>([]);
-  const [registeredUser, setRegisteredUser] = useState(null);
+  const [registeredUser, setRegisteredUser] = useState<any>(null);
   const [commentText, setCommentText] = useState<Record<number, any>>({});
-  const [socialAccount, setSocialAccount] = useState({ username: '', type: '' });
-  const [showModal, setShowModal] = useState(false);
-  const [provider, setProvider] = useState(null);
-  const [contract, setContract] = useState(null);
-  const [profileImage, setProfileImage] = useState('');
-  const [profileImageURL, setProfileImageURL] = useState('');
   const [signer, setSigner] = useState<ethers.Signer | undefined>(undefined);
   const [eoaAddress, setEoaAddress] = useState<string>('');
   const [aaAddress, setAaAddress] = useState<string>('');
-  const [supportedTokens, setSupportedTokens] = useState<Array<any>>([]);
-  const [isFetchingTokens, setIsFetchingTokens] = useState(false);
+  const [hasCheckedInitialConnection, setHasCheckedInitialConnection] = useState(false);
+ const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'disconnected'>('idle');
 
-  const router = useRouter()
-  const particlesInit = async (engine: Engine) => {
-    await loadSlim(engine); // Load tsparticles-slim
+
+  // Fetch data on wallet connection
+   const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
+     if (connectionState === 'connected') return;
+    setConnectionState('connecting');
+    try {
+      const realSigner = await getSigner();
+      setEoaAddress(eoaAddr);
+      setAaAddress(aaAddr);
+      setSigner(realSigner);
+      await fetchRegisteredUser();
+      await fetchPosts();
+      setConnectionState('connected');
+    } catch (error) {
+      setConnectionState('disconnected');
+      console.error("Error getting signer:", error);
+    }
   };
-  
-  useEffect(() => {
-    setIsLoading(true);
 
-    const loadTokens = async () => {
-      // Only run if signer is defined
-      if (signer) {
-        try {
-          // Check if signer has getAddress method
-          if (typeof signer.getAddress !== 'function') {
-            console.error("Invalid signer: missing getAddress method");
-            toast.error("Wallet connection issue: please reconnect your wallet");
+    const handleWalletDisconnected = () => {
+    setConnectionState('disconnected');
+    setEoaAddress('');
+    setAaAddress('');
+    setSigner(undefined);
+    setRegisteredUser(null);
+  };
+
+   useEffect(() => {
+     if (hasCheckedInitialConnection) return;
+
+    const checkInitialConnection = async () => {
+      setConnectionState('connecting');
+      try {
+        if (window.ethereum) {
+          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+          if (accounts && accounts.length > 0) {
+            const signer = await getSigner();
+            const address = await signer.getAddress();
+            const aaWalletAddress = await getAAWalletAddress(signer);
+            await handleWalletConnected(address, aaWalletAddress);
             return;
           }
-
-          // Verify signer is still connected by calling getAddress
-          await signer.getAddress();
-
-          // If connected, fetch tokens
-          fetchSupportedTokens();
-        } catch (error) {
-          console.error("Signer validation error:", error);
-          toast.error("Wallet connection issue: please reconnect your wallet");
         }
-      } else {
-        // Reset tokens if signer is not available
-        setSupportedTokens([]);
-        console.log("Signer not available, tokens reset");
+        setConnectionState('disconnected');
       }
+      finally{
+         setHasCheckedInitialConnection(true);
+        if (connectionState === 'connecting') {
+          setConnectionState('disconnected');
+        }
+      }      
+      // catch (error) {
+      //   setConnectionState('disconnected');
+      //   console.error("Initial connection check failed:", error);
+      // }
     };
 
-    loadTokens();
-    fetchRegisteredUser()
-    fetchPosts()
-  }, [signer]);
+    checkInitialConnection();
+  }, [hasCheckedInitialConnection]);
 
-  const fetchSupportedTokens = async () => {
-    if (!signer) {
-      console.log("Signer not available");
-      return;
-    }
-
-    // Verify signer has getAddress method
-    if (typeof signer.getAddress !== 'function') {
-      console.error("Invalid signer: missing getAddress method");
-      toast.error("Wallet connection issue: please reconnect your wallet");
-      return;
-    }
-
-    try {
-      setIsFetchingTokens(true);
-
-      // Replace with your implementation based on the tutorial
-      const client = await initAAClient(signer);
-      const builder = await initAABuilder(signer);
-
-      // Fetch supported tokens
-      const tokens = await getSupportedTokens(client, builder);
-      setSupportedTokens(tokens);
-    } catch (error: any) {
-      console.error("Error fetching supported tokens:", error);
-      toast.error(`Token loading error: ${error.message || "Unknown error"}`);
-    } finally {
-      setIsFetchingTokens(false);
-    }
-  };
-
-    /**
-* Handle wallet connection - important to get a real signer!
-*/
-const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
-  setIsLoading(true)
-  try {
-    // Get the real signer from the wallet - don't use mock signers!
-    const realSigner = await getSigner();
-
-    setEoaAddress(eoaAddr);
-    setAaAddress(aaAddr);
-    setSigner(realSigner);
-
-    toast.success('Wallet connected successfully!');
-
-  } catch (error) {
-    console.error("Error getting signer:", error);
-    toast.error('Failed to get wallet signer. Please try again.');
-  }
-};
-
-  const fetchPosts = async () => {
-    try {
-      await getPosts();
-    } catch (error:any) {
-      console.error(error);
-      setMessage(error);
-    }
-  };
-
+  // Fetch user data
   const fetchRegisteredUser = async () => {
-    setIsLoading(true)
-
     if (!signer || !aaAddress) return;
     try {
-      console.log(aaAddress,'chc')
-        const user = await getUserByAddress(signer,aaAddress);
-        console.log(user)
-        if (user) {
-          setRegisteredUser(user);
-          setIsLoading(false)
-
-        }
+      const user = await getUserByAddress(signer, aaAddress);
+      setRegisteredUser(user || null);
     } catch (error) {
-    setIsLoading(false)
-
+      setRegisteredUser(null);
       console.error(error);
     }
   };
 
-  const register_user = async () => {
-    try {
-      if (!signer) return;
-      setMessage('Registering, please wait!');
-      const transaction = await registerUser(signer,username)
-      console.log(transaction.transactionHash);
-      if(transaction.transactionHash){
-        setMessage('User registered successfully.');
-        fetchRegisteredUser()
-        setTimeout(()=>{
-          setUsername('');
-          window.location.reload()
-        },3000)
-
-      }
-      else{
-        setMessage('Error registering.');
-      }
-      
-
-    } catch (error :any) {
-      console.error(error);
-      setMessage(error.message);
-    }
-  };
-
-  const create_post = async () => {
-    try {
-      setMessage('Creating post, please wait!');
-      if (!signer) return;
-      const transaction = await createPost(signer,content)
-      if (transaction.transactionHash) {
-        setMessage('Post created successfully!');
-        await fetchPosts();
-        setTimeout(() => {
-          setMessage('');
-          setContent('');
-          window.location.reload()
-        }, 3000);
-        
-      } else {
-        setMessage('Error creating post');
-        setTimeout(() => {
-          setMessage('');        
-        }, 3000);
-      }
-    } catch (error :any) {
-      setMessage(error.message);
-
-      console.error(error);
-    }
-  };
-
-  const like_post = async (postId :number) => {
-    try {
-      if (!signer) return;
-      setMessage('Liking post, please wait!');
-      await likePost(signer,postId)
-      setMessage('Post liked successfully.');
-      await fetchPosts();
-      setTimeout(() => {
-        setMessage('');
-        setContent('');
-        window.location.reload()
-      }, 3000);
-    } catch (error :any) {
-      console.error(error);
-      setMessage(error.message);
-    }
-  };
-
-  const add_comment = async (postId :number, comment : string)  => {
-    try {
-      if (!signer) return;
-      setMessage('Adding comment, please wait!');
-      await addComment(signer,postId,comment)
-      setMessage('Comment added successfully.');
-      await getPosts();
-
-      setTimeout(() => {
-        setMessage('');
-        setContent('');
-        window.location.reload()
-      }, 3000);
-    } catch (error :any) {
-      console.error(error);
-      setMessage(error.message);
-    }
-  };
-
-  const getPosts = async () => {
+  // Fetch posts
+  const fetchPosts = async () => {
     try {
       if (!signer) return;
       const count = await getPostsCount(signer);
       const fetchedPosts = [];
       for (let i = 0; i < count; i++) {
-        const post = await getPost(signer,i);
+        const post = await getPost(signer, i);
         const comments = [];
         for (let j = 0; j < post.commentsCount; j++) {
-          const comment = await getComment(signer,i, j);
+          const comment = await getComment(signer, i, j);
           comments.push(comment);
         }
         fetchedPosts.push({ ...post, comments });
       }
       setPosts(fetchedPosts);
-      setMessage('');
-    } catch (error :any) {
+    } catch (error: any) {
       console.error(error);
-      setMessage(error.message);
     }
   };
 
-  const handleCommentChange = (postId :number, text :string) => {
-    setCommentText(prevState => ({ ...prevState, [postId]: text }));
+  // Post actions
+  const register_user = async () => {
+    try {
+      if (!signer) return;
+      await registerUser(signer, username);
+      await fetchRegisteredUser();
+    } catch (error: any) {
+      console.error(error);
+    }
   };
 
-  const handleAddComment = (postId :number) => {
-    const comment = commentText[postId];
-    add_comment(postId, comment);
-    setCommentText(prevState => ({ ...prevState, [postId]: '' }));
+  const create_post = async () => {
+    try {
+      if (!signer) return;
+      await createPost(signer, content);
+      await fetchPosts();
+      setContent('');
+    } catch (error: any) {
+      console.error(error);
+    }
   };
 
-
-  const particlesOptions: ISourceOptions = {  
-    background: {
-      color: "#ffffff",
-    },
-    fpsLimit: 60,
-    interactivity: {
-      events: {
-        onClick: { enable: true, mode: "push" },
-        onHover: { enable: true, mode: "repulse" },
-      },
-      modes: {
-        push: { quantity: 4 },
-        repulse: { distance: 200 },
-      },
-    },
-    particles: {
-      color: { value: "#ff0000" },
-      links: { color: "#ffffff", distance: 150, opacity: 0.5, width: 1 },
-      move: { enable: true, speed: 6, direction: "none" },
-      number: { value: 80, density: { enable: true, value_area: 800 } },
-      opacity: { value: 0.5 },
-      shape: { type: "circle" },
-      size: { value: 5, random: true },
-    },
-    detectRetina: true,
+  const like_post = async (postId: number) => {
+    try {
+      if (!signer) return;
+      await likePost(signer, postId);
+      await fetchPosts();
+    } catch (error: any) {
+      console.error(error);
+    }
   };
 
- 
+  const add_comment = async (postId: number, comment: string) => {
+    try {
+      if (!signer) return;
+      await addComment(signer, postId, comment);
+      await fetchPosts();
+    } catch (error: any) {
+      console.error(error);
+    }
+  };
 
- return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
+    // Loading state
+  if (connectionState === 'connecting') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900">
+        <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-gray-300">Connecting to wallet...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 overflow-x-hidden">
       <ParticleBackground />
-      <NavBar onWalletConnected={handleWalletConnected} />
+      <ToastContainer position="top-right" autoClose={3000} />
+
+      <NavBar>
+        <WalletConnect 
+          onWalletConnected={handleWalletConnected}
+          onDisconnect={handleWalletDisconnected}
+          initialConnectionState={connectionState === 'connected'}
+        />
+      </NavBar>
+
 
       <main className="pt-24 pb-12 px-4 max-w-4xl mx-auto">
-        {!registeredUser ? (
-          <RegisterForm 
-            username={username} 
-            setUsername={setUsername} 
-            registerUser={register_user} 
-            isLoading={isLoading} 
-          />
-        ) : (
-          <>
-            <CreatePost 
-              content={content} 
-              setContent={setContent} 
-              createPost={create_post} 
-              isLoading={isLoading} 
-            />
-
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="mt-8"
-            >
-              <h2 className="text-3xl font-bold text-white mb-6">Latest Posts</h2>
-              
-              <div className="space-y-6">
-                {posts.map((post:any, index:any) => (
-                  <PostCard
-                    key={index}
-                    post={{ ...post, id: index }}
-                    onLike={like_post}
-                    onComment={add_comment}
-                    isRegistered={!!registeredUser}
-                  />
-                ))}
-              </div>
-            </motion.div>
-          </>
+        {/* User Profile Section (when connected) */}
+        {registeredUser && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mb-8"
+          >
+            <UserProfile user={registeredUser} />
+          </motion.div>
         )}
+
+        {/* Registration/Post Creation */}
+        <AnimatePresence mode="wait">
+          {!registeredUser && eoaAddress && (
+            <motion.div
+              key="register-form"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.3 }}
+            >
+              <RegisterForm
+                username={username}
+                setUsername={setUsername}
+                registerUser={register_user}
+                isLoading={isLoading}
+              />
+            </motion.div>
+          )}
+          {/* Registration or Post Creation - shown only when wallet is connected */}
+      {connectionState === 'connected' && (
+        <>
+          {!registeredUser && eoaAddress && (
+            <motion.div
+              key="register-form"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.3 }}
+            >
+              <RegisterForm 
+                username={username} 
+                setUsername={setUsername} 
+                registerUser={register_user} 
+                isLoading={isLoading} 
+              />
+            </motion.div>
+          )}
+          {registeredUser && (
+            <motion.div
+              key="create-post"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <CreatePost 
+                content={content} 
+                setContent={setContent} 
+                createPost={create_post} 
+                isLoading={isLoading} 
+              />
+            </motion.div>
+          )}
+        </>
+      )}
+        </AnimatePresence>
+
+        {/* Posts Feed */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="mt-8"
+        >
+          <h2 className="text-3xl font-bold text-white mb-6">Latest Conversations</h2>
+
+          <div className="space-y-6">
+            {posts.map((post: any, index: number) => (
+              <PostCard
+                key={index}
+                post={{ ...post, id: index }}
+                onLike={like_post}
+                onComment={add_comment}
+                isRegistered={!!registeredUser}
+              />
+            ))}
+          </div>
+        </motion.div>
       </main>
+
+      {/* Floating Action Button */}
+      {registeredUser && (
+        <FloatingActionButton onClick={() => setContent('')} />
+      )}
     </div>
   );
-};
-
-
-export default SocialMedia;
+}
