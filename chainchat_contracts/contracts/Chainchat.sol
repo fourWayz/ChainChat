@@ -10,39 +10,39 @@ contract Chainchat is ReentrancyGuard, Ownable {
      * @param username The username of the user.
      * @param userAddress The address of the user.
      * @param isRegistered A boolean indicating if the user is registered.
+     * @param profileImage The image URL or IPFS hash for the user's profile picture.
      */
     struct User {
         string username;
         address userAddress;
         bool isRegistered;
+        string profileImage; // New field: profile picture
     }
 
     mapping(address => User) public users;
 
-    /**l
+    /**
      * @dev Struct representing a post in the dApp.
      * @param author The address of the user who created the post.
      * @param content The content of the post.
+     * @param image The optional image URL or IPFS hash attached to the post.
      * @param timestamp The time when the post was created.
      * @param likes The number of likes the post has received.
      * @param commentsCount The number of comments on the post.
+     * @param originalPostId The ID of the post being shared (0 for original posts).
      * @param likedBy A mapping to track if a user has liked the post.
      */
     struct Post {
         address author;
         string content;
+        string image; // New field: image URL or IPFS hash
         uint256 timestamp;
         uint256 likes;
         uint256 commentsCount;
-        mapping(address => bool) likedBy; // Track likes by user
+        uint256 originalPostId; // New field: shared post reference
+        mapping(address => bool) likedBy;
     }
 
-    /**
-     * @dev Struct representing a comment on a post.
-     * @param commenter The address of the user who made the comment.
-     * @param content The content of the comment.
-     * @param timestamp The time when the comment was made.
-     */
     struct Comment {
         address commenter;
         string content;
@@ -55,13 +55,12 @@ contract Chainchat is ReentrancyGuard, Ownable {
     Post[] public posts;
 
     event UserRegistered(address indexed userAddress, string username);
-    event PostCreated(address indexed author, string content, uint256 timestamp);
+    event ProfileImageUpdated(address indexed userAddress, string image);
+    event PostCreated(address indexed author, string content, string image, uint256 timestamp);
+    event PostShared(address indexed sharer, uint256 originalPostId, uint256 newPostId);
     event PostLiked(address indexed liker, uint256 indexed postId);
     event CommentAdded(address indexed commenter, uint256 indexed postId, string content, uint256 timestamp);
 
-    /**
-     * @dev Modifier to check if the sender is a registered user.
-     */
     modifier onlyRegisteredUser() {
         require(users[msg.sender].isRegistered, "User is not registered");
         _;
@@ -71,10 +70,6 @@ contract Chainchat is ReentrancyGuard, Ownable {
         transferOwnership(msg.sender);
     }
 
-    /**
-     * @dev Registers a new user.
-     * @param _username The username chosen by the user.
-     */
     function registerUser(string memory _username) external {
         require(!users[msg.sender].isRegistered, "User is already registered");
         require(bytes(_username).length > 0, "Username should not be empty");
@@ -82,41 +77,52 @@ contract Chainchat is ReentrancyGuard, Ownable {
         users[msg.sender] = User({
             username: _username,
             userAddress: msg.sender,
-            isRegistered: true
+            isRegistered: true,
+            profileImage: ""
         });
 
         emit UserRegistered(msg.sender, _username);
     }
 
-    /**
-     * @dev Returns the user details for a given address.
-     * @param _userAddress The address of the user.
-     * @return The User struct for the given address.
-     */
+    /// @notice Sets or updates the user's profile picture
+    function setProfileImage(string memory _image) external onlyRegisteredUser {
+        users[msg.sender].profileImage = _image;
+        emit ProfileImageUpdated(msg.sender, _image);
+    }
+
     function getUserByAddress(address _userAddress) external view returns (User memory) {
         require(users[_userAddress].isRegistered, "User not found");
         return users[_userAddress];
     }
 
-    /**
-     * @dev Creates a new post.
-     * @param _content The content of the post.
-     */
-    function createPost(string memory _content) external onlyRegisteredUser {
+    /// @notice Creates a new post, optionally with an image
+    function createPost(string memory _content, string memory _image) external onlyRegisteredUser {
         require(bytes(_content).length > 0, "Content should not be empty");
 
         Post storage newPost = posts.push();
         newPost.author = msg.sender;
         newPost.content = _content;
+        newPost.image = _image;
         newPost.timestamp = block.timestamp;
+        newPost.originalPostId = 0;
 
-        emit PostCreated(msg.sender, _content, block.timestamp);
+        emit PostCreated(msg.sender, _content, _image, block.timestamp);
     }
 
-    /**
-     * @dev Likes a post.
-     * @param _postId The ID of the post to like.
-     */
+    /// @notice Shares an existing post
+    function sharePost(uint256 _postId) external onlyRegisteredUser {
+        require(_postId < posts.length, "Original post does not exist");
+
+        Post storage sharedPost = posts.push();
+        sharedPost.author = msg.sender;
+        sharedPost.content = posts[_postId].content;
+        sharedPost.image = posts[_postId].image;
+        sharedPost.timestamp = block.timestamp;
+        sharedPost.originalPostId = _postId;
+
+        emit PostShared(msg.sender, _postId, posts.length - 1);
+    }
+
     function likePost(uint256 _postId) external onlyRegisteredUser nonReentrant {
         require(_postId < posts.length, "Post does not exist");
 
@@ -129,11 +135,6 @@ contract Chainchat is ReentrancyGuard, Ownable {
         emit PostLiked(msg.sender, _postId);
     }
 
-    /**
-     * @dev Adds a comment to a post.
-     * @param _postId The ID of the post to comment on.
-     * @param _content The content of the comment.
-     */
     function addComment(uint256 _postId, string memory _content) external onlyRegisteredUser nonReentrant {
         require(_postId < posts.length, "Post does not exist");
         require(bytes(_content).length > 0, "Comment should not be empty");
@@ -151,43 +152,25 @@ contract Chainchat is ReentrancyGuard, Ownable {
         emit CommentAdded(msg.sender, _postId, _content, block.timestamp);
     }
 
-    /**
-     * @dev Returns the total number of posts.
-     * @return The total number of posts.
-     */
     function getPostsCount() external view returns (uint256) {
         return posts.length;
     }
 
-    /**
-     * @dev Returns the details of a post.
-     * @param _postId The ID of the post.
-     * @return author The address of the post's author.
-     * @return content The content of the post.
-     * @return timestamp The time when the post was created.
-     * @return likes The number of likes the post has received.
-     * @return commentsCount The number of comments on the post.
-     */
+    /// @notice Returns post data, including new image and originalPostId fields
     function getPost(uint256 _postId) external view returns (
         address author,
         string memory content,
+        string memory image,
         uint256 timestamp,
         uint256 likes,
-        uint256 commentsCount
+        uint256 commentsCount,
+        uint256 originalPostId
     ) {
         require(_postId < posts.length, "Post does not exist");
         Post storage post = posts[_postId];
-        return (post.author, post.content, post.timestamp, post.likes, post.commentsCount);
+        return (post.author, post.content, post.image, post.timestamp, post.likes, post.commentsCount, post.originalPostId);
     }
 
-    /**
-     * @dev Returns the details of a comment on a post.
-     * @param _postId The ID of the post.
-     * @param _commentId The ID of the comment.
-     * @return commenter The address of the user who made the comment.
-     * @return content The content of the comment.
-     * @return timestamp The time when the comment was made.
-     */
     function getComment(uint256 _postId, uint256 _commentId) external view returns (
         address commenter,
         string memory content,

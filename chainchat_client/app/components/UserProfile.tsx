@@ -26,30 +26,35 @@ const UserProfile = ({
       className="bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700/50 mb-6"
     >
       <div className="flex items-center space-x-4">
-        <div className="relative">
-          {user.profileImage || preview ? (
-            <img
-              src={preview || user.profileImage}
-              alt="Profile"
-              className="w-16 h-16 rounded-full object-cover border-2 border-purple-500 cursor-pointer"
-              onClick={() => fileInputRef.current?.click()}
-            />
-          ) : (
-            <div
-              className="bg-gradient-to-r from-purple-500 to-pink-500 w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold text-white cursor-pointer"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {user.username.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <input
-            type="file"
-            accept="image/*"
-            ref={fileInputRef}
-            className="hidden"
-            onChange={handleImageChange}
-          />
-        </div>
+      <div className="relative">
+  {user.profileImage || preview ? (
+    <img
+      src={preview || user.profileImage}
+      alt="Profile"
+      className="w-16 h-16 rounded-full object-cover border-2 border-purple-500"
+    />
+  ) : (
+    <div
+      className="bg-gradient-to-r from-purple-500 to-pink-500 w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold text-white"
+    >
+      {user.username.charAt(0).toUpperCase()}
+    </div>
+  )}
+  <input
+    type="file"
+    accept="image/*"
+    ref={fileInputRef}
+    className="hidden"
+    onChange={handleImageChange}
+  />
+  <button
+    onClick={() => fileInputRef.current?.click()}
+    className="mt-2 text-xs text-purple-400 hover:underline"
+  >
+    Change profile image
+  </button>
+</div>
+
         <div>
           <h3 className="text-xl font-bold text-white">{user.username}</h3>
           <p className="text-gray-400 text-sm">

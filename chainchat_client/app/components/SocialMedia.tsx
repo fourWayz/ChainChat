@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ethers } from "ethers";
+import { ethers, BigNumber } from "ethers";
 import { motion, AnimatePresence } from "framer-motion";
-import { ToastContainer,toast } from "react-toastify";
+import { ToastContainer, toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
 
@@ -139,6 +139,23 @@ export default function SocialMediaApp() {
     }
   }
 
+  const sharePost = async (postId:any) => {
+  try {
+    const shareUrl = `${window.location.origin}`;
+    
+    if (navigator.share) {
+      await navigator.share({
+        title: 'Check out this post',
+        url: shareUrl
+      });
+    } else {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success('Link copied!')
+    }
+  } catch (error) {
+    throw error;
+  }
+};
   const setProfileImage = async (file: File) => {
     if (!signer) return;
     try {
@@ -181,6 +198,8 @@ export default function SocialMediaApp() {
         }
         fetchedPosts.push({ ...post, comments });
       }
+
+      console.log(fetchPosts)
       setPosts(fetchedPosts);
     } catch (error: any) {
       console.error(error);
@@ -193,7 +212,7 @@ export default function SocialMediaApp() {
       if (!signer) return;
       setIsLoading(true)
       const tx = await registerUser(signer, username);
-      if(tx.transactionHash){
+      if (tx.transactionHash) {
         toast.success('Registered Successfully!')
       }
       await fetchRegisteredUser();
@@ -209,10 +228,14 @@ export default function SocialMediaApp() {
   const create_post = async (imageUrl?: string) => {
     try {
       if (!signer) return;
-      await createPost(signer, content, imageUrl ?? "");
+      setIsLoading(true)
+      const tx = await createPost(signer, content, imageUrl ?? "");
+      tx.transactionHash
       await fetchPosts(signer);
       setContent('');
+      setIsLoading(false)
     } catch (error: any) {
+      setIsLoading(false)
       console.error(error);
     }
   };
@@ -236,6 +259,8 @@ export default function SocialMediaApp() {
       console.error(error);
     }
   };
+
+  
 
   // Loading state
   if (connectionState === 'connecting') {
@@ -334,15 +359,28 @@ export default function SocialMediaApp() {
               <h2 className="text-3xl font-bold text-white mb-6">Latest Posts</h2>
 
               <div className="space-y-6">
-                {posts.map((post: any, index: number) => (
-                  <PostCard
-                    key={index}
-                    post={{ ...post, id: index }}
-                    onLike={like_post}
-                    onComment={add_comment}
-                    isRegistered={!!registeredUser}
-                  />
-                ))}
+                {posts.map((post: any, index: number) => {
+                  const safePost = {
+                    ...post,
+                    id: index,
+                    likes: BigNumber.isBigNumber(post.likes) ? post.likes.toNumber() : post.likes,
+                    commentsCount: BigNumber.isBigNumber(post.commentsCount) ? post.commentsCount.toNumber() : post.commentsCount,
+                    timestamp: BigNumber.isBigNumber(post.timestamp) ? post.timestamp.toNumber() : post.timestamp,
+                  };
+
+                  return (
+                    <PostCard
+                      key={index}
+                      post={safePost}
+                      onLike={like_post}
+                      onComment={add_comment}
+                      onShare={sharePost}
+                      isRegistered={!!registeredUser}
+                      signer={signer}
+                      getUserByAddress={getUserByAddress} 
+                    />
+                  );
+                })}
               </div>
             </motion.div>
           </>
