@@ -46,9 +46,15 @@ export default function SocialMediaApp() {
   const [eoaAddress, setEoaAddress] = useState<string>('');
   const [aaAddress, setAaAddress] = useState<string>('');
   const [isConnecting, setIsConnecting] = useState(false);
-  const [hasCheckedInitialConnection, setHasCheckedInitialConnection] = useState(false);
+  const [needsRefresh, setNeedsRefresh] = useState(false);
   const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'disconnected'>('idle');
 
+useEffect(() => {
+  if (needsRefresh && signer) {
+    fetchPosts(signer);
+    setNeedsRefresh(false);
+  }
+}, [needsRefresh, signer]);
 
   const uploadToPinata = async (file: File) => {
     const formData = new FormData();
@@ -184,29 +190,35 @@ export default function SocialMediaApp() {
   };
 
   // Fetch posts
-  const fetchPosts = async (signer: any) => {
-    try {
-      if (!signer) return;
-      const count = await getPostsCount(signer);
-      const fetchedPosts = [];
-      for (let i = 0; i < count; i++) {
-        const post = await getPost(signer, i);
-        const comments = [];
-        for (let j = 0; j < post.commentsCount; j++) {
-          const comment = await getComment(signer, i, j);
-          comments.push(comment);
-        }
-        fetchedPosts.push({ ...post, comments });
+const fetchPosts = async (signer:any) => {
+  try {
+    setIsLoading(true);
+     if (!signer) return;
+    const count = await getPostsCount(signer);
+    const fetchedPosts = [];
+    
+    for (let i = 0; i < count; i++) {
+      const post = await getPost(signer, i);
+      const comments = [];
+      
+      for (let j = 0; j < post.commentsCount; j++) {
+        const comment = await getComment(signer, i, j);
+        comments.push(comment);
       }
-
-      console.log(fetchPosts)
-      setPosts(fetchedPosts);
-    } catch (error: any) {
-      console.error(error);
+      
+      fetchedPosts.push({ ...post, comments });
     }
-  };
+    
+    setPosts(fetchedPosts);
+  } catch (error) {
+    console.error("Failed to fetch posts:", error);
+    toast.error("Failed to load posts");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
-  // Post actions
+  // register user
   const register_user = async () => {
     try {
       if (!signer) return;
@@ -231,7 +243,8 @@ export default function SocialMediaApp() {
       setIsLoading(true)
       const tx = await createPost(signer, content, imageUrl ?? "");
       tx.transactionHash
-      await fetchPosts(signer);
+        toast.success("Post created successfully!");
+      setNeedsRefresh(true);
       setContent('');
       setIsLoading(false)
     } catch (error: any) {
@@ -244,6 +257,8 @@ export default function SocialMediaApp() {
     try {
       if (!signer) return;
       await likePost(signer, postId);
+      setNeedsRefresh(true);
+       toast.success("Post liked!");
       await fetchPosts(signer);
     } catch (error: any) {
       console.error(error);
@@ -254,7 +269,8 @@ export default function SocialMediaApp() {
     try {
       if (!signer) return;
       await addComment(signer, postId, comment);
-      await fetchPosts(signer);
+      setNeedsRefresh(true);
+       toast.success("Comment added!");
     } catch (error: any) {
       console.error(error);
     }
@@ -370,7 +386,8 @@ export default function SocialMediaApp() {
 
                   return (
                     <PostCard
-                      key={index}
+                      key=
+                      {index}
                       post={safePost}
                       onLike={like_post}
                       onComment={add_comment}
