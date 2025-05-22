@@ -5,6 +5,7 @@ import { ethers } from "ethers";
 import { motion, AnimatePresence } from "framer-motion";
 import { ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
+import axios from 'axios';
 
 // Components
 import ParticleBackground from "@/app/components/ParticleBackground";
@@ -30,7 +31,8 @@ import {
   getPost,
   getComment,
   getUserByAddress,
-  getAAWalletAddress
+  getAAWalletAddress,
+  UploadProfileImage
 } from '@/utils/aautils';
 
 export default function SocialMediaApp() {
@@ -45,43 +47,73 @@ export default function SocialMediaApp() {
   const [aaAddress, setAaAddress] = useState<string>('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [hasCheckedInitialConnection, setHasCheckedInitialConnection] = useState(false);
- const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'disconnected'>('idle');
+  const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'disconnected'>('idle');
 
 
-const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
-  console.log('Connection initiated');
-  if (connectionState === 'connected') return;
-  
-  setConnectionState('connecting');
-  setIsLoading(true); // Ensure loading state is set
-  
-  try {
-    const realSigner = await getSigner();
-    const user = await getUserByAddress(realSigner, aaAddr);
-    
-    console.log('Fetched user:', user); // Debug log
-    
-    setEoaAddress(eoaAddr);
-    setAaAddress(aaAddr);
-    setSigner(realSigner);
-    setRegisteredUser(user || null); // Explicitly set to null if no user
-    
-    if (user) {
-      await fetchPosts(realSigner);
+  const uploadToPinata = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        pinata_api_key: process.env.NEXT_PUBLIC_PINATA_KEY!,
+        pinata_secret_api_key: process.env.NEXT_PUBLIC_PINATA_SECRET!,
+      },
+    });
+
+    return `https://gateway.pinata.cloud/ipfs/${res.data.IpfsHash}`;
+  };
+
+  const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
+    console.log('Connection initiated');
+    if (connectionState === 'connected') return;
+
+    setConnectionState('connecting');
+    setIsLoading(true);
+
+    try {
+      const realSigner = await getSigner();
+
+      setEoaAddress(eoaAddr);
+      setAaAddress(aaAddr);
+      setSigner(realSigner);
+
+      try {
+        // Attempt to get user, but don't fail if not found
+        const user = await getUserByAddress(realSigner, aaAddr);
+        console.log('User fetch result:', user);
+
+        if (user) {
+          // User exists - proceed normally
+          setRegisteredUser(user);
+          await fetchPosts(realSigner);
+        } else {
+          // User not found - this is normal for new users
+          setRegisteredUser(null);
+        }
+        setConnectionState('connected');
+
+      } catch (userError: any) {
+        // Special handling for "user not found" errors
+        if (userError.message.includes('User not found')) {
+          console.log('New user detected - showing registration form');
+          setRegisteredUser(null);
+          setConnectionState('connected');
+        } else {
+          throw userError;
+        }
+      }
+
+    } catch (error) {
+      console.error("Actual connection error:", error);
+      setConnectionState('disconnected');
+      setRegisteredUser(null);
+    } finally {
+      setIsLoading(false);
     }
-    
-    setConnectionState('connected');
-  } catch (error) {
-    console.error("Connection error:", error);
-    setConnectionState('disconnected');
-    setRegisteredUser(null);
-  } finally {
-    setIsLoading(false); // Ensure loading is cleared
-    console.log('Connection state:', connectionState); // Debug log
-  }
-};
-
-    const handleWalletDisconnected = () => {
+  };
+  const handleWalletDisconnected = () => {
     setConnectionState('disconnected');
     setEoaAddress('');
     setAaAddress('');
@@ -90,62 +122,43 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
   };
 
   const handleConnectWallet = async () => {
-  if (connectionState === 'connected' || isConnecting) return;
-  
-  setIsConnecting(true);
-  try {
-    const signer = await getSigner();
-    const address = await signer.getAddress();
-    const aaWalletAddress = await getAAWalletAddress(signer);
-    
-    await handleWalletConnected(address, aaWalletAddress);
-  } catch (error) {
-    console.error("Connection error:", error);
-    setConnectionState('disconnected');
-  } finally {
-    setIsConnecting(false);
+    if (connectionState === 'connected' || isConnecting) return;
+
+    setIsConnecting(true);
+    try {
+      const signer = await getSigner();
+      const address = await signer.getAddress();
+      const aaWalletAddress = await getAAWalletAddress(signer);
+
+      await handleWalletConnected(address, aaWalletAddress);
+    } catch (error) {
+      console.error("Connection error:", error);
+      setConnectionState('disconnected');
+    } finally {
+      setIsConnecting(false);
+    }
   }
-}
 
-  //  useEffect(() => {
-  //    if (hasCheckedInitialConnection) return;
+  const setProfileImage = async (file: File) => {
+    if (!signer) return;
+    try {
+      const imageUrl = await uploadToPinata(file);
+      await UploadProfileImage(signer, imageUrl);
+      console.log("Profile image set:", imageUrl);
+      await fetchRegisteredUser();
+    } catch (err) {
+      console.error("Error setting profile image", err);
+    }
+  };
 
-  //   const checkInitialConnection = async () => {
-  //     setConnectionState('connecting');
-  //     try {
-  //       if (window.ethereum) {
-  //         const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-  //         if (accounts && accounts.length > 0) {
-  //           const signer = await getSigner();
-  //           const address = await signer.getAddress();
-  //           const aaWalletAddress = await getAAWalletAddress(signer);
-  //           await handleWalletConnected(address, aaWalletAddress);
-  //           return;
-  //         }
-  //       }
-  //       setConnectionState('disconnected');
-  //     }
-  //     finally{
-  //        setHasCheckedInitialConnection(true);
-  //       if (connectionState === 'connecting') {
-  //         setConnectionState('disconnected');
-  //       }
-  //     }      
-  //     // catch (error) {
-  //     //   setConnectionState('disconnected');
-  //     //   console.error("Initial connection check failed:", error);
-  //     // }
-  //   };
 
-  //   checkInitialConnection();
-  // }, [hasCheckedInitialConnection]);
 
   // Fetch user data
   const fetchRegisteredUser = async () => {
     if (!signer || !aaAddress) return;
     try {
       const user = await getUserByAddress(signer, aaAddress);
-      console.log(user,'aa')
+      console.log(user, 'aa')
       setRegisteredUser(user || null);
     } catch (error) {
       setRegisteredUser(null);
@@ -154,7 +167,7 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
   };
 
   // Fetch posts
-  const fetchPosts = async (signer:any) => {
+  const fetchPosts = async (signer: any) => {
     try {
       if (!signer) return;
       const count = await getPostsCount(signer);
@@ -178,17 +191,21 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
   const register_user = async () => {
     try {
       if (!signer) return;
+      setIsLoading(true)
       await registerUser(signer, username);
       await fetchRegisteredUser();
+      setIsLoading(false)
     } catch (error: any) {
       console.error(error);
+      setIsLoading(false)
+
     }
   };
 
-  const create_post = async () => {
+  const create_post = async (imageUrl?: string) => {
     try {
       if (!signer) return;
-      await createPost(signer, content);
+      await createPost(signer, content, imageUrl ?? "");
       await fetchPosts(signer);
       setContent('');
     } catch (error: any) {
@@ -216,7 +233,7 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
     }
   };
 
-    // Loading state
+  // Loading state
   if (connectionState === 'connecting') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900">
@@ -231,80 +248,101 @@ const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
       <ParticleBackground />
       <ToastContainer position="top-right" autoClose={3000} />
 
-    <NavBar>
-  <WalletConnect 
-    isConnected={connectionState === 'connected'}
-    isConnecting={isConnecting}
-    onConnect={handleConnectWallet}
-    onDisconnect={handleWalletDisconnected}
-    eoaAddress={eoaAddress}
-    aaAddress={aaAddress}
-  />
-</NavBar>
+      <NavBar>
+        <WalletConnect
+          isConnected={connectionState === 'connected'}
+          isConnecting={isConnecting}
+          onConnect={handleConnectWallet}
+          onDisconnect={handleWalletDisconnected}
+          eoaAddress={eoaAddress}
+          aaAddress={aaAddress}
+        />
+      </NavBar>
 
 
       <main className="pt-24 pb-12 px-4 max-w-4xl mx-auto">
-       
+        {!registeredUser && (
+          <motion.div
+            key="register-form"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3 }}
+            className="mb-8"
+          >
+            <RegisterForm
+              username={username}
+              setUsername={setUsername}
+              registerUser={register_user}
+              isLoading={isLoading}
+              isWalletConnected={connectionState === 'connected'}
+            />
+          </motion.div>
+        )}
+        {registeredUser && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mb-8"
+          >
+            <UserProfile
+              user={{
+                username: registeredUser.username || "Anonymous",
+                address: registeredUser.userAddress,
+                profileImage: registeredUser.profileImage,
+              }}
+              onSetProfileImage={setProfileImage}
+            />
+          </motion.div>
+        )}
+
         {/* Registration/Post Creation */}
-       <AnimatePresence mode="wait">
-  {connectionState === 'connected' && (
-    <>
-      {registeredUser ? (
-        <motion.div
-          key="create-post"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.3 }}
-        >
-          <CreatePost 
-            content={content} 
-            setContent={setContent} 
-            createPost={create_post} 
-            isLoading={isLoading} 
-          />
-        </motion.div>
-      ) : (
-        <motion.div
-          key="register-form"
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.9 }}
-          transition={{ duration: 0.3 }}
-        >
-          <RegisterForm 
-            username={username} 
-            setUsername={setUsername} 
-            registerUser={register_user} 
-            isLoading={isLoading} 
-          />
-        </motion.div>
-      )}
-    </>
-  )}
-</AnimatePresence>
+        <AnimatePresence mode="wait">
+          {registeredUser && (
+            <>
+              <motion.div
+                key="create-post"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <CreatePost
+                  content={content}
+                  setContent={setContent}
+                  createPost={create_post}
+                  isLoading={isLoading}
+                />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
-        {/* Posts Feed */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="mt-8"
-        >
-          <h2 className="text-3xl font-bold text-white mb-6">Latest Conversations</h2>
+        {registeredUser && (
+          <>
+            {/* Posts Feed */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="mt-8"
+            >
+              <h2 className="text-3xl font-bold text-white mb-6">Latest Conversations</h2>
 
-          <div className="space-y-6">
-            {posts.map((post: any, index: number) => (
-              <PostCard
-                key={index}
-                post={{ ...post, id: index }}
-                onLike={like_post}
-                onComment={add_comment}
-                isRegistered={!!registeredUser}
-              />
-            ))}
-          </div>
-        </motion.div>
+              <div className="space-y-6">
+                {posts.map((post: any, index: number) => (
+                  <PostCard
+                    key={index}
+                    post={{ ...post, id: index }}
+                    onLike={like_post}
+                    onComment={add_comment}
+                    isRegistered={!!registeredUser}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          </>
+        )}
       </main>
 
       {/* Floating Action Button */}

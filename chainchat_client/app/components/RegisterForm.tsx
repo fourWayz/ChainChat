@@ -5,11 +5,13 @@ const RegisterForm = ({
   setUsername,
   registerUser,
   isLoading,
+   isWalletConnected
 }: {
   username: string;
   setUsername: (username: string) => void;
   registerUser: () => void;
   isLoading: boolean;
+   isWalletConnected : boolean
 }) => {
   return (
     <motion.div
@@ -39,20 +41,34 @@ const RegisterForm = ({
             />
           </div>
 
-          <button
-            onClick={registerUser}
-            disabled={isLoading || !username.trim()}
-            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 px-4 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {isLoading ? (
-              <div className="flex items-center justify-center space-x-2">
-                <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
-                <span>Registering...</span>
-              </div>
-            ) : (
-              "Complete Registration"
-            )}
-          </button>
+         <button
+          onClick={registerUser}
+          disabled={!isWalletConnected || isLoading} 
+          className={`w-full ${
+            !isWalletConnected 
+              ? "bg-gray-600 cursor-not-allowed"
+              : isLoading
+                ? "bg-purple-600"
+                : "bg-purple-500 hover:bg-purple-600"
+          }`}
+        >
+          {!isWalletConnected ? (
+            "Connect Wallet First"
+          ) : isLoading ? (
+            <>
+              <span className="spinner-border spinner-border-sm me-2"></span>
+              Registering...
+            </>
+          ) : (
+            "Complete Registration"
+          )}
+        </button>
+
+         {!isWalletConnected && (
+          <div className="text-yellow-400 text-sm mt-2">
+            Please connect your wallet before registering
+          </div>
+        )}
         </div>
       </div>
     </motion.div>

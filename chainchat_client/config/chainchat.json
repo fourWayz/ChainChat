@@ -98,6 +98,12 @@
         },
         {
           "indexed": false,
+          "internalType": "string",
+          "name": "image",
+          "type": "string"
+        },
+        {
+          "indexed": false,
           "internalType": "uint256",
           "name": "timestamp",
           "type": "uint256"
@@ -123,6 +129,50 @@
         }
       ],
       "name": "PostLiked",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sharer",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "originalPostId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newPostId",
+          "type": "uint256"
+        }
+      ],
+      "name": "PostShared",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "userAddress",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "image",
+          "type": "string"
+        }
+      ],
+      "name": "ProfileImageUpdated",
       "type": "event"
     },
     {
@@ -167,6 +217,11 @@
         {
           "internalType": "string",
           "name": "_content",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_image",
           "type": "string"
         }
       ],
@@ -230,6 +285,11 @@
           "type": "string"
         },
         {
+          "internalType": "string",
+          "name": "image",
+          "type": "string"
+        },
+        {
           "internalType": "uint256",
           "name": "timestamp",
           "type": "uint256"
@@ -242,6 +302,11 @@
         {
           "internalType": "uint256",
           "name": "commentsCount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "originalPostId",
           "type": "uint256"
         }
       ],
@@ -287,6 +352,11 @@
               "internalType": "bool",
               "name": "isRegistered",
               "type": "bool"
+            },
+            {
+              "internalType": "string",
+              "name": "profileImage",
+              "type": "string"
             }
           ],
           "internalType": "struct Chainchat.User",
@@ -397,6 +467,11 @@
           "type": "string"
         },
         {
+          "internalType": "string",
+          "name": "image",
+          "type": "string"
+        },
+        {
           "internalType": "uint256",
           "name": "timestamp",
           "type": "uint256"
@@ -409,6 +484,11 @@
         {
           "internalType": "uint256",
           "name": "commentsCount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "originalPostId",
           "type": "uint256"
         }
       ],
@@ -431,6 +511,32 @@
     {
       "inputs": [],
       "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_image",
+          "type": "string"
+        }
+      ],
+      "name": "setProfileImage",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_postId",
+          "type": "uint256"
+        }
+      ],
+      "name": "sharePost",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -472,6 +578,11 @@
           "internalType": "bool",
           "name": "isRegistered",
           "type": "bool"
+        },
+        {
+          "internalType": "string",
+          "name": "profileImage",
+          "type": "string"
         }
       ],
       "stateMutability": "view",

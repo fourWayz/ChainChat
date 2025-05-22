@@ -342,6 +342,29 @@ export const registerUser = async (
       throw error;
     }
   };
+
+   /**
+   * set profile image
+   * @param accountSigner - Ethers signer object
+   * @param imageURI - image URI
+   */
+    export const UploadProfileImage = async (
+    accountSigner: ethers.Signer,
+      imageURI : string
+  ) => {
+    try {
+      return await executeOperation(
+        accountSigner,
+        CONTRACT_ADDRESSES.chainchatContract,
+        CHAINCHAT_ABI,
+        'setProfileImage',
+        [imageURI]
+      );
+    } catch (error) {
+      console.error("Error setting profile image :", error);
+      throw error;
+    }
+  };
   
   /**
    * Get user details by address
@@ -369,7 +392,8 @@ export const registerUser = async (
    */
   export const createPost = async (
     accountSigner: ethers.Signer,
-    content: string
+    content: string,
+    imageURI : string
   ) => {
     try {
       return await executeOperation(
@@ -377,10 +401,33 @@ export const registerUser = async (
         CONTRACT_ADDRESSES.chainchatContract,
         CHAINCHAT_ABI,
         'createPost',
-        [content]
+        [content,imageURI]
       );
     } catch (error) {
       console.error("Error creating post:", error);
+      throw error;
+    }
+  };
+
+    /**
+   * share a post
+   * @param accountSigner - Ethers signer object
+   * @param postId - Post ID
+   */
+    export const sharePost = async (
+    accountSigner: ethers.Signer,
+      postId : number
+  ) => {
+    try {
+      return await executeOperation(
+        accountSigner,
+        CONTRACT_ADDRESSES.chainchatContract,
+        CHAINCHAT_ABI,
+        'sharePost',
+        [postId]
+      );
+    } catch (error) {
+      console.error("Error sharing post:", error);
       throw error;
     }
   };

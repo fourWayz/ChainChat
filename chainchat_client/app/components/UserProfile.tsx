@@ -1,7 +1,24 @@
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 
-const UserProfile = ({ user }: { user: any }) => {
-    console.log(user,'user')
+const UserProfile = ({
+  user,
+  onSetProfileImage,
+}: {
+  user: any;
+  onSetProfileImage: (file: File) => void;
+}) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPreview(URL.createObjectURL(file));
+      onSetProfileImage(file);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -9,8 +26,29 @@ const UserProfile = ({ user }: { user: any }) => {
       className="bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700/50 mb-6"
     >
       <div className="flex items-center space-x-4">
-        <div className="bg-gradient-to-r from-purple-500 to-pink-500 w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold text-white">
-          {user.username.charAt(0).toUpperCase()}
+        <div className="relative">
+          {user.profileImage || preview ? (
+            <img
+              src={preview || user.profileImage}
+              alt="Profile"
+              className="w-16 h-16 rounded-full object-cover border-2 border-purple-500 cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+            />
+          ) : (
+            <div
+              className="bg-gradient-to-r from-purple-500 to-pink-500 w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold text-white cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {user.username.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            ref={fileInputRef}
+            className="hidden"
+            onChange={handleImageChange}
+          />
         </div>
         <div>
           <h3 className="text-xl font-bold text-white">{user.username}</h3>
