@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { motion, AnimatePresence } from "framer-motion";
-import { ToastContainer } from "react-toastify";
+import { ToastContainer,toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
 
@@ -192,10 +192,14 @@ export default function SocialMediaApp() {
     try {
       if (!signer) return;
       setIsLoading(true)
-      await registerUser(signer, username);
+      const tx = await registerUser(signer, username);
+      if(tx.transactionHash){
+        toast.success('Registered Successfully!')
+      }
       await fetchRegisteredUser();
       setIsLoading(false)
     } catch (error: any) {
+      toast.error('Error registering!')
       console.error(error);
       setIsLoading(false)
 
@@ -327,7 +331,7 @@ export default function SocialMediaApp() {
               transition={{ delay: 0.4 }}
               className="mt-8"
             >
-              <h2 className="text-3xl font-bold text-white mb-6">Latest Conversations</h2>
+              <h2 className="text-3xl font-bold text-white mb-6">Latest Posts</h2>
 
               <div className="space-y-6">
                 {posts.map((post: any, index: number) => (

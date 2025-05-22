@@ -11,7 +11,7 @@ export const NERO_CHAIN_CONFIG = {
   
   // Account Abstraction Platform configuration
   export const AA_PLATFORM_CONFIG = {
-    bundlerRpc: process.env.REACT_APP_BUNDLER_URL || "https://bundler.service.nerochain.io",
+    bundlerRpc: process.env.REACT_APP_BUNDLER_URL || "https://bundler-testnet.nerochain.io",
     paymasterRpc: process.env.REACT_APP_PAYMASTER_URL || "https://paymaster-testnet.nerochain.io",
   };
   
@@ -27,7 +27,7 @@ export const NERO_CHAIN_CONFIG = {
     tokenPaymaster: "0x5a6680dFd4a77FEea0A7be291147768EaA2414ad",
     
     // contract address 
-    chainchatContract: process.env.NEXT_PUBLIC_CHAINCHAT_CONTRACT || "0xFAb2a02E15dCd2F7590b960854F950904d84fc6a",
+    chainchatContract: process.env.NEXT_PUBLIC_CHAINCHAT_CONTRACT || "0x18c42E601DB5d48Cb3A7e8fC7905d4540447474a",
   };
   
   // API key management for Paymaster
