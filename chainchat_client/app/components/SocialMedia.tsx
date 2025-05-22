@@ -52,6 +52,7 @@ export default function SocialMediaApp() {
 useEffect(() => {
   if (needsRefresh && signer) {
     fetchPosts(signer);
+    fetchRegisteredUser()
     setNeedsRefresh(false);
   }
 }, [needsRefresh, signer]);
@@ -226,8 +227,8 @@ const fetchPosts = async (signer:any) => {
       const tx = await registerUser(signer, username);
       if (tx.transactionHash) {
         toast.success('Registered Successfully!')
+        setNeedsRefresh(true);
       }
-      await fetchRegisteredUser();
       setIsLoading(false)
     } catch (error: any) {
       toast.error('Error registering!')
