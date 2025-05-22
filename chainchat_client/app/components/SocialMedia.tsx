@@ -43,27 +43,43 @@ export default function SocialMediaApp() {
   const [signer, setSigner] = useState<ethers.Signer | undefined>(undefined);
   const [eoaAddress, setEoaAddress] = useState<string>('');
   const [aaAddress, setAaAddress] = useState<string>('');
+  const [isConnecting, setIsConnecting] = useState(false);
   const [hasCheckedInitialConnection, setHasCheckedInitialConnection] = useState(false);
  const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'disconnected'>('idle');
 
 
-  // Fetch data on wallet connection
-   const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
-     if (connectionState === 'connected') return;
-    setConnectionState('connecting');
-    try {
-      const realSigner = await getSigner();
-      setEoaAddress(eoaAddr);
-      setAaAddress(aaAddr);
-      setSigner(realSigner);
-      await fetchRegisteredUser();
-      await fetchPosts();
-      setConnectionState('connected');
-    } catch (error) {
-      setConnectionState('disconnected');
-      console.error("Error getting signer:", error);
+const handleWalletConnected = async (eoaAddr: string, aaAddr: string) => {
+  console.log('Connection initiated');
+  if (connectionState === 'connected') return;
+  
+  setConnectionState('connecting');
+  setIsLoading(true); // Ensure loading state is set
+  
+  try {
+    const realSigner = await getSigner();
+    const user = await getUserByAddress(realSigner, aaAddr);
+    
+    console.log('Fetched user:', user); // Debug log
+    
+    setEoaAddress(eoaAddr);
+    setAaAddress(aaAddr);
+    setSigner(realSigner);
+    setRegisteredUser(user || null); // Explicitly set to null if no user
+    
+    if (user) {
+      await fetchPosts(realSigner);
     }
-  };
+    
+    setConnectionState('connected');
+  } catch (error) {
+    console.error("Connection error:", error);
+    setConnectionState('disconnected');
+    setRegisteredUser(null);
+  } finally {
+    setIsLoading(false); // Ensure loading is cleared
+    console.log('Connection state:', connectionState); // Debug log
+  }
+};
 
     const handleWalletDisconnected = () => {
     setConnectionState('disconnected');
@@ -73,44 +89,63 @@ export default function SocialMediaApp() {
     setRegisteredUser(null);
   };
 
-   useEffect(() => {
-     if (hasCheckedInitialConnection) return;
+  const handleConnectWallet = async () => {
+  if (connectionState === 'connected' || isConnecting) return;
+  
+  setIsConnecting(true);
+  try {
+    const signer = await getSigner();
+    const address = await signer.getAddress();
+    const aaWalletAddress = await getAAWalletAddress(signer);
+    
+    await handleWalletConnected(address, aaWalletAddress);
+  } catch (error) {
+    console.error("Connection error:", error);
+    setConnectionState('disconnected');
+  } finally {
+    setIsConnecting(false);
+  }
+}
 
-    const checkInitialConnection = async () => {
-      setConnectionState('connecting');
-      try {
-        if (window.ethereum) {
-          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-          if (accounts && accounts.length > 0) {
-            const signer = await getSigner();
-            const address = await signer.getAddress();
-            const aaWalletAddress = await getAAWalletAddress(signer);
-            await handleWalletConnected(address, aaWalletAddress);
-            return;
-          }
-        }
-        setConnectionState('disconnected');
-      }
-      finally{
-         setHasCheckedInitialConnection(true);
-        if (connectionState === 'connecting') {
-          setConnectionState('disconnected');
-        }
-      }      
-      // catch (error) {
-      //   setConnectionState('disconnected');
-      //   console.error("Initial connection check failed:", error);
-      // }
-    };
+  //  useEffect(() => {
+  //    if (hasCheckedInitialConnection) return;
 
-    checkInitialConnection();
-  }, [hasCheckedInitialConnection]);
+  //   const checkInitialConnection = async () => {
+  //     setConnectionState('connecting');
+  //     try {
+  //       if (window.ethereum) {
+  //         const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+  //         if (accounts && accounts.length > 0) {
+  //           const signer = await getSigner();
+  //           const address = await signer.getAddress();
+  //           const aaWalletAddress = await getAAWalletAddress(signer);
+  //           await handleWalletConnected(address, aaWalletAddress);
+  //           return;
+  //         }
+  //       }
+  //       setConnectionState('disconnected');
+  //     }
+  //     finally{
+  //        setHasCheckedInitialConnection(true);
+  //       if (connectionState === 'connecting') {
+  //         setConnectionState('disconnected');
+  //       }
+  //     }      
+  //     // catch (error) {
+  //     //   setConnectionState('disconnected');
+  //     //   console.error("Initial connection check failed:", error);
+  //     // }
+  //   };
+
+  //   checkInitialConnection();
+  // }, [hasCheckedInitialConnection]);
 
   // Fetch user data
   const fetchRegisteredUser = async () => {
     if (!signer || !aaAddress) return;
     try {
       const user = await getUserByAddress(signer, aaAddress);
+      console.log(user,'aa')
       setRegisteredUser(user || null);
     } catch (error) {
       setRegisteredUser(null);
@@ -119,7 +154,7 @@ export default function SocialMediaApp() {
   };
 
   // Fetch posts
-  const fetchPosts = async () => {
+  const fetchPosts = async (signer:any) => {
     try {
       if (!signer) return;
       const count = await getPostsCount(signer);
@@ -154,7 +189,7 @@ export default function SocialMediaApp() {
     try {
       if (!signer) return;
       await createPost(signer, content);
-      await fetchPosts();
+      await fetchPosts(signer);
       setContent('');
     } catch (error: any) {
       console.error(error);
@@ -165,7 +200,7 @@ export default function SocialMediaApp() {
     try {
       if (!signer) return;
       await likePost(signer, postId);
-      await fetchPosts();
+      await fetchPosts(signer);
     } catch (error: any) {
       console.error(error);
     }
@@ -175,7 +210,7 @@ export default function SocialMediaApp() {
     try {
       if (!signer) return;
       await addComment(signer, postId, comment);
-      await fetchPosts();
+      await fetchPosts(signer);
     } catch (error: any) {
       console.error(error);
     }
@@ -196,83 +231,58 @@ export default function SocialMediaApp() {
       <ParticleBackground />
       <ToastContainer position="top-right" autoClose={3000} />
 
-      <NavBar>
-        <WalletConnect 
-          onWalletConnected={handleWalletConnected}
-          onDisconnect={handleWalletDisconnected}
-          initialConnectionState={connectionState === 'connected'}
-        />
-      </NavBar>
+    <NavBar>
+  <WalletConnect 
+    isConnected={connectionState === 'connected'}
+    isConnecting={isConnecting}
+    onConnect={handleConnectWallet}
+    onDisconnect={handleWalletDisconnected}
+    eoaAddress={eoaAddress}
+    aaAddress={aaAddress}
+  />
+</NavBar>
 
 
       <main className="pt-24 pb-12 px-4 max-w-4xl mx-auto">
-        {/* User Profile Section (when connected) */}
-        {registeredUser && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mb-8"
-          >
-            <UserProfile user={registeredUser} />
-          </motion.div>
-        )}
-
+       
         {/* Registration/Post Creation */}
-        <AnimatePresence mode="wait">
-          {!registeredUser && eoaAddress && (
-            <motion.div
-              key="register-form"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.3 }}
-            >
-              <RegisterForm
-                username={username}
-                setUsername={setUsername}
-                registerUser={register_user}
-                isLoading={isLoading}
-              />
-            </motion.div>
-          )}
-          {/* Registration or Post Creation - shown only when wallet is connected */}
-      {connectionState === 'connected' && (
-        <>
-          {!registeredUser && eoaAddress && (
-            <motion.div
-              key="register-form"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.3 }}
-            >
-              <RegisterForm 
-                username={username} 
-                setUsername={setUsername} 
-                registerUser={register_user} 
-                isLoading={isLoading} 
-              />
-            </motion.div>
-          )}
-          {registeredUser && (
-            <motion.div
-              key="create-post"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <CreatePost 
-                content={content} 
-                setContent={setContent} 
-                createPost={create_post} 
-                isLoading={isLoading} 
-              />
-            </motion.div>
-          )}
-        </>
+       <AnimatePresence mode="wait">
+  {connectionState === 'connected' && (
+    <>
+      {registeredUser ? (
+        <motion.div
+          key="create-post"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.3 }}
+        >
+          <CreatePost 
+            content={content} 
+            setContent={setContent} 
+            createPost={create_post} 
+            isLoading={isLoading} 
+          />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="register-form"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          transition={{ duration: 0.3 }}
+        >
+          <RegisterForm 
+            username={username} 
+            setUsername={setUsername} 
+            registerUser={register_user} 
+            isLoading={isLoading} 
+          />
+        </motion.div>
       )}
-        </AnimatePresence>
+    </>
+  )}
+</AnimatePresence>
 
         {/* Posts Feed */}
         <motion.div
