@@ -41,21 +41,42 @@ export default function SocialMediaApp() {
   const [isLoading, setIsLoading] = useState(true);
   const [posts, setPosts] = useState<any>([]);
   const [registeredUser, setRegisteredUser] = useState<any>(null);
-  const [commentText, setCommentText] = useState<Record<number, any>>({});
   const [signer, setSigner] = useState<ethers.Signer | undefined>(undefined);
   const [eoaAddress, setEoaAddress] = useState<string>('');
   const [aaAddress, setAaAddress] = useState<string>('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [needsRefresh, setNeedsRefresh] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
   const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'disconnected'>('idle');
+  const [registrationKey, setRegistrationKey] = useState(0);
 
-useEffect(() => {
-  if (needsRefresh && signer) {
-    fetchPosts(signer);
-    fetchRegisteredUser()
-    setNeedsRefresh(false);
-  }
-}, [needsRefresh, signer]);
+  useEffect(() => {
+    if (needsRefresh && signer) {
+      fetchPosts(signer);
+      // fetchRegisteredUser()
+      setNeedsRefresh(false);
+    }
+  }, [needsRefresh, signer]);
+
+  useEffect(() => {
+    if (signer && aaAddress) {
+      getUserByAddress(signer, aaAddress).then(user => {
+        if (user) setRegisteredUser(user);
+      });
+    }
+  }, [signer, aaAddress, registrationKey])
+
+  useEffect(() => {
+  // Check every 5 seconds if still connected but no user
+  const interval = setInterval(() => {
+    if (aaAddress && signer && !registeredUser) {
+      console.log('Periodic registration check...');
+      forceUserRefresh();
+    }
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, [aaAddress, signer, registeredUser]);
 
   const uploadToPinata = async (file: File) => {
     const formData = new FormData();
@@ -85,6 +106,10 @@ useEffect(() => {
       setEoaAddress(eoaAddr);
       setAaAddress(aaAddr);
       setSigner(realSigner);
+
+       // EMERGENCY FIX
+  window.addEventListener('visibilitychange', forceUserRefresh);
+  window.addEventListener('focus', forceUserRefresh);
 
       try {
         // Attempt to get user, but don't fail if not found
@@ -121,6 +146,9 @@ useEffect(() => {
     }
   };
   const handleWalletDisconnected = () => {
+      // Remove the listeners when disconnecting
+  window.removeEventListener('visibilitychange', forceUserRefresh);
+  window.removeEventListener('focus', forceUserRefresh)
     setConnectionState('disconnected');
     setEoaAddress('');
     setAaAddress('');
@@ -146,23 +174,23 @@ useEffect(() => {
     }
   }
 
-  const sharePost = async (postId:any) => {
-  try {
-    const shareUrl = `${window.location.origin}`;
-    
-    if (navigator.share) {
-      await navigator.share({
-        title: 'Check out this post',
-        url: shareUrl
-      });
-    } else {
-      await navigator.clipboard.writeText(shareUrl);
-      toast.success('Link copied!')
+  const sharePost = async (postId: any) => {
+    try {
+      const shareUrl = `${window.location.origin}`;
+
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Check out this post',
+          url: shareUrl
+        });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('Link copied!')
+      }
+    } catch (error) {
+      throw error;
     }
-  } catch (error) {
-    throw error;
-  }
-};
+  };
   const setProfileImage = async (file: File) => {
     if (!signer) return;
     try {
@@ -179,9 +207,10 @@ useEffect(() => {
 
   // Fetch user data
   const fetchRegisteredUser = async () => {
+    console.log('checkings')
     if (!signer || !aaAddress) return;
     try {
-      const user = await getUserByAddress(signer, aaAddress);
+      const user = await getUserByAddress(signer, '0x6158c3929EAC7beFe0Ae729b5f8E135010640181');
       console.log(user, 'aa')
       setRegisteredUser(user || null);
     } catch (error) {
@@ -191,43 +220,44 @@ useEffect(() => {
   };
 
   // Fetch posts
-const fetchPosts = async (signer:any) => {
-  try {
-    setIsLoading(true);
-     if (!signer) return;
-    const count = await getPostsCount(signer);
-    const fetchedPosts = [];
-    
-    for (let i = 0; i < count; i++) {
-      const post = await getPost(signer, i);
-      const comments = [];
-      
-      for (let j = 0; j < post.commentsCount; j++) {
-        const comment = await getComment(signer, i, j);
-        comments.push(comment);
+  const fetchPosts = async (signer: any) => {
+    try {
+      setIsLoading(true);
+      if (!signer) return;
+      const count = await getPostsCount(signer);
+      const fetchedPosts = [];
+
+      for (let i = 0; i < count; i++) {
+        const post = await getPost(signer, i);
+        const comments = [];
+
+        for (let j = 0; j < post.commentsCount; j++) {
+          const comment = await getComment(signer, i, j);
+          comments.push(comment);
+        }
+
+        fetchedPosts.push({ ...post, comments });
       }
-      
-      fetchedPosts.push({ ...post, comments });
+
+      setPosts(fetchedPosts);
+    } catch (error) {
+      console.error("Failed to fetch posts:", error);
+      toast.error("Failed to load posts");
+    } finally {
+      setIsLoading(false);
     }
-    
-    setPosts(fetchedPosts);
-  } catch (error) {
-    console.error("Failed to fetch posts:", error);
-    toast.error("Failed to load posts");
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   // register user
-  const register_user = async () => {
+
+    const register_user = async () => {
     try {
       if (!signer) return;
       setIsLoading(true)
       const tx = await registerUser(signer, username);
       if (tx.transactionHash) {
         toast.success('Registered Successfully!')
-        setNeedsRefresh(true);
+        forceUserRefresh();
       }
       setIsLoading(false)
     } catch (error: any) {
@@ -237,14 +267,13 @@ const fetchPosts = async (signer:any) => {
 
     }
   };
-
   const create_post = async (imageUrl?: string) => {
     try {
       if (!signer) return;
       setIsLoading(true)
       const tx = await createPost(signer, content, imageUrl ?? "");
       tx.transactionHash
-        toast.success("Post created successfully!");
+      toast.success("Post created successfully!");
       setNeedsRefresh(true);
       setContent('');
       setIsLoading(false)
@@ -259,7 +288,7 @@ const fetchPosts = async (signer:any) => {
       if (!signer) return;
       await likePost(signer, postId);
       setNeedsRefresh(true);
-       toast.success("Post liked!");
+      toast.success("Post liked!");
       await fetchPosts(signer);
     } catch (error: any) {
       console.error(error);
@@ -271,13 +300,32 @@ const fetchPosts = async (signer:any) => {
       if (!signer) return;
       await addComment(signer, postId, comment);
       setNeedsRefresh(true);
-       toast.success("Comment added!");
+      toast.success("Comment added!");
     } catch (error: any) {
       console.error(error);
     }
   };
 
+  const forceUserRefresh = async () => {
+  if (!signer || !aaAddress) return;
   
+  console.log('Forcing user data refresh...');
+  try {
+    const user = await getUserByAddress(signer, aaAddress);
+    if (user) {
+      console.log('Found registered user:', user);
+      setRegisteredUser(user);
+      await fetchPosts(signer)
+    } else {
+      console.log('No user found');
+      setRegisteredUser(null);
+    }
+  } catch (error) {
+    console.error('Refresh failed:', error);
+  }
+};
+
+
 
   // Loading state
   if (connectionState === 'connecting') {
@@ -395,7 +443,7 @@ const fetchPosts = async (signer:any) => {
                       onShare={sharePost}
                       isRegistered={!!registeredUser}
                       signer={signer}
-                      getUserByAddress={getUserByAddress} 
+                      getUserByAddress={getUserByAddress}
                     />
                   );
                 })}
