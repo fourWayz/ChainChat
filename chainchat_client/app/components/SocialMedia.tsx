@@ -54,18 +54,19 @@ export default function SocialMediaApp() {
   const [registrationKey, setRegistrationKey] = useState(0);
 
   useEffect(() => {
-    if (needsRefresh && signer) {
+    if (signer) {
       fetchPosts(signer);
       // fetchRegisteredUser()
       setNeedsRefresh(false);
     }
-  }, [needsRefresh, signer]);
+  }, [posts, signer]);
 
   useEffect(() => {
     if (signer && aaAddress) {
       getUserByAddress(signer, aaAddress).then(user => {
         if (user) setRegisteredUser(user);
         retrieveBalance(signer,aaAddress)
+        fetchPosts(signer);
       });
     }
   }, [signer, aaAddress, registrationKey])
