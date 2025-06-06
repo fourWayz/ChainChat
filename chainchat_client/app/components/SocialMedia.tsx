@@ -57,7 +57,7 @@ export default function SocialMediaApp() {
     if (signer) {
       fetchPosts(signer);
       // fetchRegisteredUser()
-      setNeedsRefresh(false);
+      // setNeedsRefresh(false);
     }
   }, [posts, signer]);
 
@@ -233,7 +233,7 @@ export default function SocialMediaApp() {
   // Fetch posts
   const fetchPosts = async (signer: any) => {
     try {
-      setIsLoading(true);
+      // setIsLoading(true);
       if (!signer) return;
       const count = await getPostsCount(signer);
       const fetchedPosts = [];

@@ -71,14 +71,14 @@ const CreatePost = ({
         });
         setIsUploading(false);
       }
-
+      
       await createPost(imageUrl);
       
       // Reset form on success
       setContent("");
       removeImage();
       toast.success("Post created successfully!");
-    } catch (error) {
+    } catch (error:any) {
       console.error("Error creating post:", error);
       toast.error(error.message || "Failed to create post");
       setIsUploading(false);
