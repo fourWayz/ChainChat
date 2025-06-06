@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
+    "@privy-io/react-auth": "^2.13.8",
     "axios": "^1.9.0",
     "bootstrap": "^5.3.6",
     "date-fns": "^4.1.0",
@@ -26,7 +27,8 @@
     "toastify": "^2.0.1",
     "tsparticles": "^3.8.1",
     "tsparticles-slim": "^2.12.0",
-    "userop": "github:nerochain/aa-userop-sdk"
+    "userop": "github:nerochain/aa-userop-sdk",
+    "wagmi": "^2.15.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

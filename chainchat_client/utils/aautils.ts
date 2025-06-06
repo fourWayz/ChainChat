@@ -2,7 +2,7 @@ import { BigNumber, ethers } from 'ethers';
 import { Client, Presets } from 'userop';
 import { NERO_CHAIN_CONFIG, AA_PLATFORM_CONFIG, CONTRACT_ADDRESSES, API_KEY } from '@/config/config';
 import CHAINCHAT_ABI from '@/config/chainchat.json';
-
+import CCTokenABI from '@/config/CCTokenABI.json'
 // =================================================================
 // Provider and Signer Management
 // =================================================================
@@ -449,6 +449,25 @@ export const registerUser = async (
       throw error;
     }
   };
+
+  export const getBalance = async(
+     accountSigner:  ethers.Signer,
+     userAddress : string
+  )=>{
+    try {
+        const tokenContract = new ethers.Contract(
+          process.env.NEXT_PUBLIC_CCT_TOKEN_ADDRESS!,
+          CCTokenABI,
+          accountSigner
+        )
+
+        return await tokenContract.balanceOf(userAddress);
+
+    } catch (error) {
+      console.error("Error getting balance:", error);
+      throw error;
+    }
+  }
   
   /**
    * Get total number of posts

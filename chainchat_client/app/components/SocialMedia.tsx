@@ -5,6 +5,7 @@ import { ethers, BigNumber } from "ethers";
 import { motion, AnimatePresence } from "framer-motion";
 import { ToastContainer, toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
+import { formatEther } from "ethers/lib/utils";
 import axios from 'axios';
 
 // Components
@@ -32,7 +33,8 @@ import {
   getComment,
   getUserByAddress,
   getAAWalletAddress,
-  UploadProfileImage
+  UploadProfileImage,
+  getBalance
 } from '@/utils/aautils';
 
 export default function SocialMediaApp() {
@@ -44,6 +46,7 @@ export default function SocialMediaApp() {
   const [signer, setSigner] = useState<ethers.Signer | undefined>(undefined);
   const [eoaAddress, setEoaAddress] = useState<string>('');
   const [aaAddress, setAaAddress] = useState<string>('');
+  const [balance, setBalance] = useState<any>()
   const [isConnecting, setIsConnecting] = useState(false);
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -62,21 +65,28 @@ export default function SocialMediaApp() {
     if (signer && aaAddress) {
       getUserByAddress(signer, aaAddress).then(user => {
         if (user) setRegisteredUser(user);
+        retrieveBalance(signer,aaAddress)
       });
     }
   }, [signer, aaAddress, registrationKey])
 
-  useEffect(() => {
-  // Check every 5 seconds if still connected but no user
-  const interval = setInterval(() => {
-    if (aaAddress && signer && !registeredUser) {
-      console.log('Periodic registration check...');
-      forceUserRefresh();
-    }
-  }, 5000);
 
-  return () => clearInterval(interval);
-}, [aaAddress, signer, registeredUser]);
+  useEffect(() => {
+    // Check every 5 seconds if still connected but no user
+    const interval = setInterval(() => {
+      if (aaAddress && signer && !registeredUser) {
+        console.log('Periodic registration check...');
+        forceUserRefresh();
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [aaAddress, signer, registeredUser]);
+
+  const retrieveBalance = async (signer:any, aaAddress:any)=>{
+    const balance = await getBalance(signer, aaAddress)
+    setBalance(formatEther(balance.toString()))
+  }
 
   const uploadToPinata = async (file: File) => {
     const formData = new FormData();
@@ -107,9 +117,9 @@ export default function SocialMediaApp() {
       setAaAddress(aaAddr);
       setSigner(realSigner);
 
-       // EMERGENCY FIX
-  window.addEventListener('visibilitychange', forceUserRefresh);
-  window.addEventListener('focus', forceUserRefresh);
+      // EMERGENCY FIX
+      window.addEventListener('visibilitychange', forceUserRefresh);
+      window.addEventListener('focus', forceUserRefresh);
 
       try {
         // Attempt to get user, but don't fail if not found
@@ -146,9 +156,9 @@ export default function SocialMediaApp() {
     }
   };
   const handleWalletDisconnected = () => {
-      // Remove the listeners when disconnecting
-  window.removeEventListener('visibilitychange', forceUserRefresh);
-  window.removeEventListener('focus', forceUserRefresh)
+    // Remove the listeners when disconnecting
+    window.removeEventListener('visibilitychange', forceUserRefresh);
+    window.removeEventListener('focus', forceUserRefresh)
     setConnectionState('disconnected');
     setEoaAddress('');
     setAaAddress('');
@@ -250,7 +260,7 @@ export default function SocialMediaApp() {
 
   // register user
 
-    const register_user = async () => {
+  const register_user = async () => {
     try {
       if (!signer) return;
       setIsLoading(true)
@@ -307,23 +317,23 @@ export default function SocialMediaApp() {
   };
 
   const forceUserRefresh = async () => {
-  if (!signer || !aaAddress) return;
-  
-  console.log('Forcing user data refresh...');
-  try {
-    const user = await getUserByAddress(signer, aaAddress);
-    if (user) {
-      console.log('Found registered user:', user);
-      setRegisteredUser(user);
-      await fetchPosts(signer)
-    } else {
-      console.log('No user found');
-      setRegisteredUser(null);
+    if (!signer || !aaAddress) return;
+
+    console.log('Forcing user data refresh...');
+    try {
+      const user = await getUserByAddress(signer, aaAddress);
+      if (user) {
+        console.log('Found registered user:', user);
+        setRegisteredUser(user);
+        await fetchPosts(signer)
+      } else {
+        console.log('No user found');
+        setRegisteredUser(null);
+      }
+    } catch (error) {
+      console.error('Refresh failed:', error);
     }
-  } catch (error) {
-    console.error('Refresh failed:', error);
-  }
-};
+  };
 
 
 
@@ -384,6 +394,7 @@ export default function SocialMediaApp() {
                 username: registeredUser.username || "Anonymous",
                 address: registeredUser.userAddress,
                 profileImage: registeredUser.profileImage,
+                balance
               }}
               onSetProfileImage={setProfileImage}
             />
