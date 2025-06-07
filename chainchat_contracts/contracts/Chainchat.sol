@@ -185,7 +185,7 @@ contract Chainchat is ReentrancyGuard, Ownable {
         post.likedBy[msg.sender] = true;
 
         // Send 1 CCT to the post creator
-        ccToken.transfer(post.author, 1 * 10**18);
+        ccToken.transfer(post.author, 1 * 10 ** 18);
 
         emit PostLiked(msg.sender, _postId);
     }
@@ -279,5 +279,11 @@ contract Chainchat is ReentrancyGuard, Ownable {
 
     function withdrawTokens() external onlyOwner {
         ccToken.transfer(owner(), ccToken.balanceOf(address(this)));
+    }
+
+    function getFreePostsRemaining(
+        address _user
+    ) external view returns (uint256) {
+        return freePostsRemaining[_user];
     }
 }

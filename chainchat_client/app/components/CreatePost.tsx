@@ -11,11 +11,14 @@ const CreatePost = ({
   setContent,
   createPost,
   isLoading,
+  freePosts
 }: {
   content: string;
   setContent: (content: string) => void;
   createPost: (imageUrl?: string) => Promise<void>;
   isLoading: boolean;
+  freePosts: any
+
 }) => {
   const { user } = usePrivy();
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -28,8 +31,7 @@ const CreatePost = ({
 
   // Check user's free post allowance and post cost
   useEffect(() => {
-
-    setFreePostsRemaining(user ? 5 - (user.postCount || 0) : 0);
+    console.log(freePosts,'test')
     setPostCost(10); // 10 CCT
   }, [user]);
 
@@ -71,14 +73,14 @@ const CreatePost = ({
         });
         setIsUploading(false);
       }
-      
+
       await createPost(imageUrl);
-      
+
       // Reset form on success
       setContent("");
       removeImage();
       toast.success("Post created successfully!");
-    } catch (error:any) {
+    } catch (error: any) {
       console.error("Error creating post:", error);
       toast.error(error.message || "Failed to create post");
       setIsUploading(false);
@@ -108,8 +110,8 @@ const CreatePost = ({
 
         {/* Cost indicator */}
         <div className="text-sm text-purple-300 mt-2">
-          {freePostsRemaining > 0 ? (
-            <span>Free posts remaining: {freePostsRemaining}</span>
+          {freePosts > 0 ? (
+            <span>Free posts remaining: {freePosts}</span>
           ) : (
             <span>Cost: {postCost} CCT</span>
           )}
@@ -172,7 +174,7 @@ const CreatePost = ({
                 <FaTimes className="text-white" />
               </button>
             </div>
-            
+
             {isUploading && (
               <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
                 <div

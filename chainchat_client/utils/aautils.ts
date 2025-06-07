@@ -450,6 +450,19 @@ export const registerUser = async (
     }
   };
 
+   export const getFreePostRemaining = async (
+    accountSigner:  ethers.Signer,
+    userAddress: string
+  ) => {
+    try {
+        const contract = getChainChatReadContract(accountSigner);
+        return await contract.getFreePostsRemaining(userAddress);
+    } catch (error) {
+      console.error("Error fetching free post remaining:", error);
+      throw error;
+    }
+  };
+
   export const getBalance = async(
      accountSigner:  ethers.Signer,
      userAddress : string

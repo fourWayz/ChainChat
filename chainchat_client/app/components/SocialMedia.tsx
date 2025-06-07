@@ -34,7 +34,8 @@ import {
   getUserByAddress,
   getAAWalletAddress,
   UploadProfileImage,
-  getBalance
+  getBalance,
+  getFreePostRemaining
 } from '@/utils/aautils';
 
 export default function SocialMediaApp() {
@@ -47,6 +48,7 @@ export default function SocialMediaApp() {
   const [eoaAddress, setEoaAddress] = useState<string>('');
   const [aaAddress, setAaAddress] = useState<string>('');
   const [balance, setBalance] = useState<any>()
+  const [freePosts, setFreePosts] = useState<any>()
   const [isConnecting, setIsConnecting] = useState(false);
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -66,6 +68,7 @@ export default function SocialMediaApp() {
       getUserByAddress(signer, aaAddress).then(user => {
         if (user) setRegisteredUser(user);
         retrieveBalance(signer,aaAddress)
+        getRemainingFreePosts(signer,aaAddress)
         fetchPosts(signer);
       });
     }
@@ -87,6 +90,11 @@ export default function SocialMediaApp() {
   const retrieveBalance = async (signer:any, aaAddress:any)=>{
     const balance = await getBalance(signer, aaAddress)
     setBalance(formatEther(balance.toString()))
+  }
+
+  const getRemainingFreePosts = async(signer:any,aaAddress:any)=>{
+    const freepost = await getFreePostRemaining(signer,aaAddress)
+    setFreePosts(freepost.toNumber())
   }
 
   const uploadToPinata = async (file: File) => {
@@ -395,7 +403,7 @@ export default function SocialMediaApp() {
                 username: registeredUser.username || "Anonymous",
                 address: registeredUser.userAddress,
                 profileImage: registeredUser.profileImage,
-                balance
+                balance,
               }}
               onSetProfileImage={setProfileImage}
             />
@@ -418,6 +426,7 @@ export default function SocialMediaApp() {
                   setContent={setContent}
                   createPost={create_post}
                   isLoading={isLoading}
+                  freePosts={freePosts}
                 />
               </motion.div>
             </>
