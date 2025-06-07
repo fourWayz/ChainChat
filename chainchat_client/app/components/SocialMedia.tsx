@@ -314,6 +314,9 @@ export default function SocialMediaApp() {
       if (!signer) return;
       await likePost(signer, postId);
       setNeedsRefresh(true);
+        setTimeout(()=>{
+
+      },7000)
       toast.success("Post liked!");
       await fetchPosts(signer);
     } catch (error: any) {
@@ -326,6 +329,9 @@ export default function SocialMediaApp() {
       if (!signer) return;
       await addComment(signer, postId, comment);
       setNeedsRefresh(true);
+        setTimeout(()=>{
+
+      },7000)
       toast.success("Comment added!");
     } catch (error: any) {
       console.error(error);
