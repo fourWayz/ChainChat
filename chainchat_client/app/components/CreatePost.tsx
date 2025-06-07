@@ -25,6 +25,7 @@ const CreatePost = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [loading, setIsloading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [postCost, setPostCost] = useState<number>(0);
   const [freePostsRemaining, setFreePostsRemaining] = useState<number>(0);
@@ -74,16 +75,19 @@ const CreatePost = ({
         setIsUploading(false);
       }
 
+      setIsloading(true)
       await createPost(imageUrl);
+      setIsloading(false)
+
 
       // Reset form on success
       setContent("");
       removeImage();
-      toast.success("Post created successfully!");
     } catch (error: any) {
       console.error("Error creating post:", error);
       toast.error(error.message || "Failed to create post");
       setIsUploading(false);
+      setIsloading(false)
     }
   };
 
@@ -134,10 +138,10 @@ const CreatePost = ({
 
           <button
             onClick={handleCreatePost}
-            disabled={isLoading || isUploading || !content.trim()}
+            disabled={loading || isUploading || !content.trim()}
             className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
           >
-            {isLoading || isUploading ? (
+            {loading || isUploading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
                 {isUploading ? `Uploading (${uploadProgress}%)` : "Posting..."}

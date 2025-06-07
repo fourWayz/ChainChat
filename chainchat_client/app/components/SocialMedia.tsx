@@ -58,6 +58,9 @@ export default function SocialMediaApp() {
   useEffect(() => {
     if (signer) {
       fetchPosts(signer);
+      getBalance(signer,aaAddress)
+      getRemainingFreePosts(signer,aaAddress)
+
       // fetchRegisteredUser()
       // setNeedsRefresh(false);
     }
@@ -291,9 +294,13 @@ export default function SocialMediaApp() {
       if (!signer) return;
       setIsLoading(true)
       const tx = await createPost(signer, content, imageUrl ?? "");
-      tx.transactionHash
-      toast.success("Post created successfully!");
+      await tx.transactionHash
       setNeedsRefresh(true);
+      setTimeout(()=>{
+
+      },7000)
+
+        toast.success("Post created successfully!");
       setContent('');
       setIsLoading(false)
     } catch (error: any) {
