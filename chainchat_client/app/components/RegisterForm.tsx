@@ -43,7 +43,7 @@ const RegisterForm = ({
 
          <button
           onClick={registerUser}
-          disabled={!isWalletConnected || isLoading} 
+          disabled={!isWalletConnected } 
           className={`w-full ${
             !isWalletConnected 
               ? "bg-gray-600 cursor-not-allowed"

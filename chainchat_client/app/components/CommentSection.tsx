@@ -9,6 +9,7 @@ const CommentSection = ({
   postId,
   onAddComment,
   isRegistered,
+  loading
 }: {
   comments: Array<{
     commenter: string;
@@ -20,11 +21,14 @@ const CommentSection = ({
   postId: number;
   onAddComment: (postId: number, comment: string, image?: string) => void;
   isRegistered: boolean;
+  loading:boolean
 }) => {
   const [newComment, setNewComment] = useState("");
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [replyImagePreview, setReplyImagePreview] = useState<string | null>(null);
+    const [isLoading, setIsloading] = useState(false);
+  
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, isReply: boolean = false) => {
     const file = e.target.files?.[0];
@@ -43,10 +47,10 @@ const CommentSection = ({
 
   const handleAddComment = (isReply: boolean = false, replyIndex?: number) => {
     if ((isReply ? !newComment && !replyImagePreview : !newComment && !imagePreview)) return;
-
     const commentContent = isReply 
       ? `@${comments[replyIndex!].commenter.slice(0, 6)} ${newComment}`
       : newComment;
+    setIsloading(true)
 
     onAddComment(
       postId, 
@@ -55,6 +59,7 @@ const CommentSection = ({
     );
 
     setNewComment("");
+    setIsloading(false)
     if (isReply) {
       setReplyImagePreview(null);
       setReplyingTo(null);
@@ -198,7 +203,7 @@ const CommentSection = ({
                   onClick={() => handleAddComment()}
                   className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-r-lg hover:opacity-90"
                 >
-                  Post
+                  {isLoading ? 'commenting' : 'Comment'}
                 </button>
               </div>
             </div>

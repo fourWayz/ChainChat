@@ -25,19 +25,19 @@ export const getSigner = async () => {
   if (!window.ethereum) {
     throw new Error("No crypto wallet found. Please install MetaMask.");
   }
-  
+
   try {
     // Request account access
     await window.ethereum.request({ method: 'eth_requestAccounts' });
- 
+
     // Create provider and signer
     const provider = new ethers.providers.Web3Provider(window.ethereum);
     const signer = provider.getSigner();
- 
+
     // Verify the signer by getting its address
     const address = await signer.getAddress();
     console.log("Connected wallet address:", address);
- 
+
     return signer;
   } catch (error) {
     console.error("Error connecting to wallet:", error);
@@ -80,7 +80,7 @@ export const getAAWalletAddress = async (accountSigner: ethers.Signer) => {
     if (!accountSigner || typeof accountSigner.getAddress !== 'function') {
       throw new Error("Invalid signer object: must have a getAddress method");
     }
-    
+
     // Initialize the SimpleAccount builder
     const simpleAccount = await Presets.Builder.SimpleAccount.init(
       accountSigner,
@@ -91,11 +91,11 @@ export const getAAWalletAddress = async (accountSigner: ethers.Signer) => {
         factory: CONTRACT_ADDRESSES.accountFactory,
       }
     );
-    
+
     // Get the counterfactual address of the AA wallet
     const address = await simpleAccount.getSender();
     console.log("AA wallet address:", address);
-    
+
     return address;
   } catch (error) {
     console.error("Error getting AA wallet address:", error);
@@ -120,11 +120,11 @@ export const initAABuilder = async (accountSigner: ethers.Signer, apiKey?: strin
     if (!accountSigner || typeof accountSigner.getAddress !== 'function') {
       throw new Error("Invalid signer object: must have a getAddress method");
     }
- 
+
     // Get the signer address to verify it's working
     const signerAddress = await accountSigner.getAddress();
     console.log("Initializing AA builder for address:", signerAddress);
-    
+
     // Initialize the SimpleAccount builder
     const builder = await Presets.Builder.SimpleAccount.init(
       accountSigner,
@@ -135,22 +135,22 @@ export const initAABuilder = async (accountSigner: ethers.Signer, apiKey?: strin
         factory: CONTRACT_ADDRESSES.accountFactory,
       }
     );
-    
+
     // Set API key for paymaster
     const currentApiKey = apiKey || API_KEY;
-    
+
     // Set paymaster options with API key
     builder.setPaymasterOptions({
       apikey: currentApiKey,
       rpc: AA_PLATFORM_CONFIG.paymasterRpc,
       type: "0" // Default to free (sponsored gas)
     });
-    
+
     // Set gas parameters for the UserOperation
     builder.setCallGasLimit(300000);
     builder.setVerificationGasLimit(2000000);
     builder.setPreVerificationGas(100000);
-    
+
     return builder;
   } catch (error) {
     console.error("Error initializing AA builder:", error);
@@ -167,17 +167,17 @@ export const initAABuilder = async (accountSigner: ethers.Signer, apiKey?: strin
  * @returns Updated builder
  */
 export const setPaymentType = (builder: any, paymentType: number, tokenAddress: string = '') => {
-  const paymasterOptions: any = { 
+  const paymasterOptions: any = {
     type: paymentType.toString(),
     apikey: API_KEY,
     rpc: AA_PLATFORM_CONFIG.paymasterRpc
   };
-  
+
   // Add token address if ERC20 payment is selected
   if (paymentType > 0 && tokenAddress) {
     paymasterOptions.token = tokenAddress;
   }
-  
+
   builder.setPaymasterOptions(paymasterOptions);
   return builder;
 };
@@ -216,13 +216,13 @@ export const executeOperation = async (
     if (!accountSigner || typeof accountSigner.getAddress !== 'function') {
       throw new Error("Invalid signer: missing getAddress method");
     }
-    
+
     // Initialize client
     const client = await initAAClient(accountSigner);
- 
+
     // Initialize builder with paymaster
     const builder = await initAABuilder(accountSigner, options?.apiKey);
- 
+
     // Set payment type and token if specified
     if (paymentType > 0 && selectedToken) {
       // Set payment options for ERC20 tokens
@@ -240,37 +240,37 @@ export const executeOperation = async (
         type: paymentType.toString()
       });
     }
- 
+
     // Create contract instance
     const contract = new ethers.Contract(
       contractAddress,
       contractAbi,
       getProvider()
     );
- 
+
     // Encode function call data
     const callData = contract.interface.encodeFunctionData(
       functionName,
       functionParams
     );
- 
+
     // Set transaction data in the builder
     const userOp = await builder.execute(contractAddress, 0, callData);
- 
+
     // Send the user operation
     console.log("Sending UserOperation to bundler");
     const res = await client.sendUserOperation(userOp);
- 
+
     console.log("UserOperation sent with hash:", res.userOpHash);
- 
+
     // Wait for the transaction to be included
     const receipt = await res.wait();
- 
+
     // Log transaction hash when available
     if (receipt && receipt.transactionHash) {
       console.log("Transaction mined:", receipt.transactionHash);
     }
- 
+
     // Return operation results
     return {
       userOpHash: res.userOpHash,
@@ -289,19 +289,17 @@ export const executeOperation = async (
  * @param abi - Contract ABI
  * @param signer - signer
  */
-export const getReadOnlyContract = (address: string, abi: any[], 
-    accountSigner: ethers.Signer) => {
-    return new ethers.Contract(address, abi, accountSigner);
-  };
+export const getReadOnlyContract = (address: string, abi: any[]) => {
+  return new ethers.Contract(address, abi, getProvider());
+};
 
-  //  contract instance getters
+//  contract instance getters
 const getChainChatReadContract = (accountSigner: ethers.Signer) => {
-    return getReadOnlyContract(
-      CONTRACT_ADDRESSES.chainchatContract,
-      CHAINCHAT_ABI,
-      accountSigner
-    );
-  };
+  return getReadOnlyContract(
+    CONTRACT_ADDRESSES.chainchatContract,
+    CHAINCHAT_ABI
+  );
+};
 // =================================================================
 // CHAINCHAT FUNCTIONS
 // =================================================================
@@ -317,300 +315,434 @@ const getChainChatReadContract = (accountSigner: ethers.Signer) => {
  * @param options - Additional options like API key
  */
 export const registerUser = async (
-    accountSigner: ethers.Signer,
-    username: string,
-    paymentType: number = 0,
-    selectedToken: string = '',
-    options?: {
-      apiKey?: string;
-      gasMultiplier?: number;
-    }
-  ) => {
-    try {
-      return await executeOperation(
-        accountSigner,
-        CONTRACT_ADDRESSES.chainchatContract,
-        CHAINCHAT_ABI,
-        'registerUser',
-        [username],
-        paymentType,
-        selectedToken,
-        options
-      );
-    } catch (error) {
-      console.error("Error registering user:", error);
-      throw error;
-    }
-  };
-
-   /**
-   * set profile image
-   * @param accountSigner - Ethers signer object
-   * @param imageURI - image URI
-   */
-    export const UploadProfileImage = async (
-    accountSigner: ethers.Signer,
-      imageURI : string
-  ) => {
-    try {
-      return await executeOperation(
-        accountSigner,
-        CONTRACT_ADDRESSES.chainchatContract,
-        CHAINCHAT_ABI,
-        'setProfileImage',
-        [imageURI]
-      );
-    } catch (error) {
-      console.error("Error setting profile image :", error);
-      throw error;
-    }
-  };
-  
-  /**
-   * Get user details by address
-   * @param accountSigner - Ethers signer/provider
-   * @param userAddress - Address to look up
-   */
-  export const getUserByAddress = async (
-    accountSigner: ethers.Signer,
-    userAddress: string
-  ) => {
-    try {
-        const contract = getChainChatReadContract(accountSigner)
-        return await contract.getUserByAddress(userAddress);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      throw error;
-    }
-  };
-  
-  // POST FUNCTIONS
-  /**
-   * Create a new post
-   * @param accountSigner - Ethers signer object
-   * @param content - Post content
-   */
-  export const createPost = async (
-    accountSigner: ethers.Signer,
-    content: string,
-    imageURI : string
-  ) => {
-    try {
-      return await executeOperation(
-        accountSigner,
-        CONTRACT_ADDRESSES.chainchatContract,
-        CHAINCHAT_ABI,
-        'createPost',
-        [content,imageURI]
-      );
-    } catch (error) {
-      console.error("Error creating post:", error);
-      throw error;
-    }
-  };
-
-    /**
-   * share a post
-   * @param accountSigner - Ethers signer object
-   * @param postId - Post ID
-   */
-    export const sharePost = async (
-    accountSigner: ethers.Signer,
-      postId : number
-  ) => {
-    try {
-      return await executeOperation(
-        accountSigner,
-        CONTRACT_ADDRESSES.chainchatContract,
-        CHAINCHAT_ABI,
-        'sharePost',
-        [postId]
-      );
-    } catch (error) {
-      console.error("Error sharing post:", error);
-      throw error;
-    }
-  };
-  
-  /**
-   * Get post details by ID
-   * @param accountSigner -  signer
-   * @param postId - ID of the post
-   */
-  export const getPost = async (
-    accountSigner:  ethers.Signer,
-    postId: number
-  ) => {
-    try {
-        const contract = getChainChatReadContract(accountSigner);
-        return await contract.getPost(postId);
-    } catch (error) {
-      console.error("Error fetching post:", error);
-      throw error;
-    }
-  };
-
-   export const getFreePostRemaining = async (
-    accountSigner:  ethers.Signer,
-    userAddress: string
-  ) => {
-    try {
-        const contract = getChainChatReadContract(accountSigner);
-        return await contract.getFreePostsRemaining(userAddress);
-    } catch (error) {
-      console.error("Error fetching free post remaining:", error);
-      throw error;
-    }
-  };
-
-  export const getBalance = async(
-     accountSigner:  ethers.Signer,
-     userAddress : string
-  )=>{
-    try {
-        const tokenContract = new ethers.Contract(
-          process.env.NEXT_PUBLIC_CCT_TOKEN_ADDRESS!,
-          CCTokenABI,
-          accountSigner
-        )
-
-        return await tokenContract.balanceOf(userAddress);
-
-    } catch (error) {
-      console.error("Error getting balance:", error);
-      throw error;
-    }
+  accountSigner: ethers.Signer,
+  creator: string,
+  username: string,
+  paymentType: number = 0,
+  selectedToken: string = '',
+  options?: {
+    apiKey?: string;
+    gasMultiplier?: number;
   }
-  
-  /**
-   * Get total number of posts
-   * @param accountSigner - Ethers signer
-   */
-  export const getPostsCount = async (
-    accountSigner: ethers.Signer
-  ) => {
-    try {
-        const contract = getChainChatReadContract(accountSigner);
-        return await contract.getPostsCount();
-    } catch (error) {
-      console.error("Error getting posts count:", error);
-      throw error;
-    }
-  };
-  
-  // INTERACTION FUNCTIONS
-  /**
-   * Like a post
-   * @param accountSigner - Ethers signer object
-   * @param postId - ID of the post to like
-   */
-  export const likePost = async (
-    accountSigner: ethers.Signer,
-    postId: number
-  ) => {
-    try {
-      return await executeOperation(
-        accountSigner,
-        CONTRACT_ADDRESSES.chainchatContract,
-        CHAINCHAT_ABI,
-        'likePost',
-        [postId]
-      );
-    } catch (error) {
-      console.error("Error liking post:", error);
-      throw error;
-    }
-  };
-  
-  /**
-   * Add comment to a post
-   * @param accountSigner - Ethers signer object
-   * @param postId - ID of the post
-   * @param content - Comment content
-   */
-  export const addComment = async (
-    accountSigner: ethers.Signer,
-    postId: number,
-    content: string
-  ) => {
-    try {
-      return await executeOperation(
-        accountSigner,
-        CONTRACT_ADDRESSES.chainchatContract,
-        CHAINCHAT_ABI,
-        'addComment',
-        [postId, content]
-      );
-    } catch (error) {
-      console.error("Error adding comment:", error);
-      throw error;
-    }
-  };
-  
-  /**
-   * Get comment details
-   * @param accountSigner - Ethers signer
-   * @param postId - ID of the post
-   * @param commentId - ID of the comment
-   */
-  export const getComment = async (
-    accountSigner: ethers.Signer,
-    postId: number,
-    commentId: number
-  ) => {
-    try {
-        const contract = getChainChatReadContract(accountSigner);
-        return await contract.getComment(postId, commentId);
-    } catch (error) {
-      console.error("Error fetching comment:", error);
-      throw error;
-    }
-  };
-  
-  // ADMIN FUNCTIONS
-  /**
-   * Transfer contract ownership
-   * @param accountSigner - Current owner's signer
-   * @param newOwner - Address of new owner
-   */
-  export const transferOwnership = async (
-    accountSigner: ethers.Signer,
-    newOwner: string
-  ) => {
-    try {
-      return await executeOperation(
-        accountSigner,
-        CONTRACT_ADDRESSES.chainchatContract,
-        CHAINCHAT_ABI,
-        'transferOwnership',
-        [newOwner]
-      );
-    } catch (error) {
-      console.error("Error transferring ownership:", error);
-      throw error;
-    }
-  };
-  
-  /**
-   * Renounce contract ownership
-   * @param accountSigner - Current owner's signer
-   */
-  export const renounceOwnership = async (
-    accountSigner: ethers.Signer
-  ) => {
-    try {
-      return await executeOperation(
-        accountSigner,
-        CONTRACT_ADDRESSES.chainchatContract,
-        CHAINCHAT_ABI,
-        'renounceOwnership',
-        []
-      );
-    } catch (error) {
-      console.error("Error renouncing ownership:", error);
-      throw error;
-    }
-  };
+) => {
+  try {
+    return await executeOperation(
+      accountSigner,
+      CONTRACT_ADDRESSES.chainchatContract,
+      CHAINCHAT_ABI,
+      'registerUser',
+      [creator, username],
+      paymentType,
+      selectedToken,
+      options
+    );
+  } catch (error) {
+    console.error("Error registering user:", error);
+    throw error;
+  }
+};
+
+/**
+ * Edit user profile.
+ * @param accountSigner - The user's connected wallet signer
+ * @param username - New username
+ * @param profileImage - New profile image URI
+ * @param bio - New bio text
+ * @param coverImage - New cover image URI
+ * @param interests - Array of new interests
+ */
+export const editUserProfile = async (
+  accountSigner: ethers.Signer,
+  username: string,
+  profileImage: string,
+  bio: string,
+  coverImage: string,
+  interests: string[]
+) => {
+  try {
+    return await executeOperation(
+      accountSigner,
+      CONTRACT_ADDRESSES.chainchatContract,
+      CHAINCHAT_ABI,
+      "editProfile",
+      [username, profileImage, bio, coverImage, interests]
+    );
+  } catch (error) {
+    console.error("Error editing profile:", error);
+    throw error;
+  }
+};
+
+/**
+* set profile image
+* @param accountSigner - Ethers signer object
+* @param imageURI - image URI
+*/
+export const UploadProfileImage = async (
+  accountSigner: ethers.Signer,
+  imageURI: string
+) => {
+  try {
+    return await executeOperation(
+      accountSigner,
+      CONTRACT_ADDRESSES.chainchatContract,
+      CHAINCHAT_ABI,
+      'setProfileImage',
+      [imageURI]
+    );
+  } catch (error) {
+    console.error("Error setting profile image :", error);
+    throw error;
+  }
+};
+
+/**
+ * Set user bio
+ * @param accountSigner - Ethers signer object
+ * @param bio - Bio text
+ */
+export const setBio = async (
+  accountSigner: ethers.Signer,
+  bio: string
+) => {
+  try {
+    return await executeOperation(
+      accountSigner,
+      CONTRACT_ADDRESSES.chainchatContract,
+      CHAINCHAT_ABI,
+      'setBio',
+      [bio]
+    );
+  } catch (error) {
+    console.error("Error setting bio:", error);
+    throw error;
+  }
+};
+
+/**
+ * Set user cover photo
+ * @param accountSigner - Ethers signer object
+ * @param imageURI - Cover photo URI
+ */
+export const setCoverPhoto = async (
+  accountSigner: ethers.Signer,
+  imageURI: string
+) => {
+  try {
+    return await executeOperation(
+      accountSigner,
+      CONTRACT_ADDRESSES.chainchatContract,
+      CHAINCHAT_ABI,
+      'setCoverPhoto',
+      [imageURI]
+    );
+  } catch (error) {
+    console.error("Error setting cover photo:", error);
+    throw error;
+  }
+};
+
+/**
+ * Set user interests
+ * @param accountSigner - Ethers signer object
+ * @param interests - Array of interests
+ */
+export const setUserInterests = async (
+  accountSigner: ethers.Signer,
+  interests: string[]
+) => {
+  try {
+    return await executeOperation(
+      accountSigner,
+      CONTRACT_ADDRESSES.chainchatContract,
+      CHAINCHAT_ABI,
+      'setUserInterests',
+      [interests]
+    );
+  } catch (error) {
+    console.error("Error setting interests:", error);
+    throw error;
+  }
+};
+
+
+
+/**
+ * Get user details by address
+ * @param accountSigner - Ethers signer/provider
+ * @param userAddress - Address to look up
+ */
+export const getUserByAddress = async (
+  accountSigner: ethers.Signer,
+  userAddress: string
+) => {
+  try {
+    const contract = getChainChatReadContract(accountSigner)
+    return await contract.getUserByAddress(userAddress);
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    throw error;
+  }
+};
+
+// POST FUNCTIONS
+/**
+ * Create a new post
+ * @param accountSigner - Ethers signer object
+ * @param content - Post content
+ */
+export const createPost = async (
+  accountSigner: ethers.Signer,
+  content: string,
+  imageURI: string
+) => {
+  try {
+    return await executeOperation(
+      accountSigner,
+      CONTRACT_ADDRESSES.chainchatContract,
+      CHAINCHAT_ABI,
+      'createPost',
+      [content, imageURI]
+    );
+  } catch (error) {
+    console.error("Error creating post:", error);
+    throw error;
+  }
+};
+
+/**
+* share a post
+* @param accountSigner - Ethers signer object
+* @param postId - Post ID
+*/
+export const sharePost = async (
+  accountSigner: ethers.Signer,
+  postId: number
+) => {
+  try {
+    return await executeOperation(
+      accountSigner,
+      CONTRACT_ADDRESSES.chainchatContract,
+      CHAINCHAT_ABI,
+      'sharePost',
+      [postId]
+    );
+  } catch (error) {
+    console.error("Error sharing post:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get post details by ID
+ * @param accountSigner -  signer
+ * @param postId - ID of the post
+ */
+export const getPost = async (
+  accountSigner: ethers.Signer,
+  postId: number
+) => {
+  try {
+    const contract = getChainChatReadContract(accountSigner);
+    return await contract.getPost(postId);
+  } catch (error) {
+    console.error("Error fetching post:", error);
+    throw error;
+  }
+};
+
+export const getFreePostRemaining = async (
+  accountSigner: ethers.Signer,
+  userAddress: string
+) => {
+  try {
+    const contract = getChainChatReadContract(accountSigner);
+    return await contract.getFreePostsRemaining(userAddress);
+  } catch (error) {
+    console.error("Error fetching free post remaining:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get user interests
+ * @param accountSigner - Ethers signer object
+ * @param userAddress - Address of the user
+ */
+export const getUserInterests = async (
+  accountSigner: ethers.Signer,
+  userAddress: string
+) => {
+  try {
+    const contract = getChainChatReadContract(accountSigner);
+    return await contract.getUserInterests(userAddress);
+  } catch (error) {
+    console.error("Error fetching user interests:", error);
+    throw error;
+  }
+};
+
+
+export const getBalance = async (
+  accountSigner: ethers.Signer,
+  userAddress: string
+) => {
+  try {
+    const tokenContract = new ethers.Contract(
+      process.env.NEXT_PUBLIC_CCT_TOKEN_ADDRESS!,
+      CCTokenABI,
+      getProvider()
+    )
+
+    return await tokenContract.balanceOf(userAddress);
+
+  } catch (error) {
+    console.error("Error getting balance:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get total number of posts
+ * @param accountSigner - Ethers signer
+ */
+export const getPostsCount = async (
+  accountSigner: ethers.Signer
+) => {
+  try {
+    const contract = getChainChatReadContract(accountSigner);
+    return await contract.getPostsCount();
+  } catch (error) {
+    console.error("Error getting posts count:", error);
+    throw error;
+  }
+};
+
+export const getUserStats = async (
+  accountSigner: ethers.Signer, userAddress: string
+) => {
+  try {
+    const contract = getChainChatReadContract(accountSigner)
+    return await contract.getUserStats(userAddress)
+  } catch (error) {
+    console.error('Error getting stats', error)
+  }
+}
+
+// INTERACTION FUNCTIONS
+/**
+ * Like a post
+ * @param accountSigner - Ethers signer object
+ * @param postId - ID of the post to like
+ */
+export const likePost = async (
+  accountSigner: ethers.Signer,
+  postId: number
+) => {
+  try {
+    return await executeOperation(
+      accountSigner,
+      CONTRACT_ADDRESSES.chainchatContract,
+      CHAINCHAT_ABI,
+      'likePost',
+      [postId]
+    );
+  } catch (error) {
+    console.error("Error liking post:", error);
+    throw error;
+  }
+};
+
+/**
+ * Add comment to a post
+ * @param accountSigner - Ethers signer object
+ * @param postId - ID of the post
+ * @param content - Comment content
+ */
+export const addComment = async (
+  accountSigner: ethers.Signer,
+  postId: number,
+  content: string
+) => {
+  try {
+
+    return await executeOperation(
+      accountSigner,
+      CONTRACT_ADDRESSES.chainchatContract,
+      CHAINCHAT_ABI,
+      'addComment',
+      [postId, content]
+    );
+  } catch (error) {
+    console.error("Error adding comment:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get comment details
+ * @param accountSigner - Ethers signer
+ * @param postId - ID of the post
+ * @param commentId - ID of the comment
+ */
+export const getComment = async (
+  accountSigner: ethers.Signer,
+  postId: number,
+  commentId: number
+) => {
+  try {
+    const contract = getChainChatReadContract(accountSigner);
+    return await contract.getComment(postId, commentId);
+  } catch (error) {
+    console.error("Error fetching comment:", error);
+    throw error;
+  }
+};
+
+// ADMIN FUNCTIONS
+/**
+ * Transfer contract ownership
+ * @param accountSigner - Current owner's signer
+ * @param newOwner - Address of new owner
+ */
+export const transferOwnership = async (
+  accountSigner: ethers.Signer,
+  newOwner: string
+) => {
+  try {
+    return await executeOperation(
+      accountSigner,
+      CONTRACT_ADDRESSES.chainchatContract,
+      CHAINCHAT_ABI,
+      'transferOwnership',
+      [newOwner]
+    );
+  } catch (error) {
+    console.error("Error transferring ownership:", error);
+    throw error;
+  }
+};
+
+/**
+ * Renounce contract ownership
+ * @param accountSigner - Current owner's signer
+ */
+export const renounceOwnership = async (
+  accountSigner: ethers.Signer
+) => {
+  try {
+    return await executeOperation(
+      accountSigner,
+      CONTRACT_ADDRESSES.chainchatContract,
+      CHAINCHAT_ABI,
+      'renounceOwnership',
+      []
+    );
+  } catch (error) {
+    console.error("Error renouncing ownership:", error);
+    throw error;
+  }
+};
 
 // =================================================================
 // Token Support
@@ -629,11 +761,11 @@ export const getSupportedTokens = async (client: any, builder: any) => {
     if (!builder) {
       throw new Error("Builder not initialized");
     }
- 
+
     // Get the AA wallet address
     const sender = await builder.getSender();
     console.log("Getting supported tokens for wallet:", sender);
- 
+
     // Create a minimal UserOp for querying tokens
     const minimalUserOp = {
       sender,
@@ -648,18 +780,18 @@ export const getSupportedTokens = async (client: any, builder: any) => {
       paymasterAndData: "0x",
       signature: "0x"
     };
- 
+
     // Setup provider for paymaster API call
     const provider = new ethers.providers.JsonRpcProvider(AA_PLATFORM_CONFIG.paymasterRpc);
     console.log("Connecting to paymaster RPC at:", AA_PLATFORM_CONFIG.paymasterRpc);
- 
+
     // Log API key (redacted for security)
     const maskedApiKey = API_KEY ? `${API_KEY.substring(0, 4)}...${API_KEY.substring(API_KEY.length - 4)}` : 'undefined';
     console.log(`Using API key: ${maskedApiKey}`);
-    
+
     // Try different parameter formats for the paymaster API
     let tokensResponse;
-    
+
     try {
       // First format attempt: [userOp, apiKey, entryPoint]
       console.log("Trying first parameter format for pm_supported_tokens");
@@ -670,7 +802,7 @@ export const getSupportedTokens = async (client: any, builder: any) => {
       ]);
     } catch (formatError) {
       console.warn("First parameter format failed:", formatError);
-      
+
       try {
         // Second format attempt: { userOp, entryPoint, apiKey }
         console.log("Trying second parameter format for pm_supported_tokens");
@@ -681,7 +813,7 @@ export const getSupportedTokens = async (client: any, builder: any) => {
         }]);
       } catch (format2Error) {
         console.warn("Second parameter format failed:", format2Error);
-        
+
         // Third format attempt: { op, entryPoint }
         console.log("Trying third parameter format for pm_supported_tokens");
         tokensResponse = await provider.send("pm_supported_tokens", [{
@@ -690,15 +822,15 @@ export const getSupportedTokens = async (client: any, builder: any) => {
         }]);
       }
     }
- 
+
     console.log("Tokens response:", tokensResponse);
- 
+
     // Transform and return the results
     if (!tokensResponse) {
       console.log("No tokens response received");
       return [];
     }
-    
+
     // Handle different response formats
     let tokens = [];
     if (tokensResponse.tokens) {
@@ -712,28 +844,28 @@ export const getSupportedTokens = async (client: any, builder: any) => {
         tokens = possibleTokensArray as any[];
       }
     }
-    
+
     if (tokens.length === 0) {
       console.log("No tokens found in response");
       return [];
     }
-    
+
     // Log the raw token response for debugging
     console.log("Raw tokens response:", JSON.stringify(tokensResponse));
-    
+
     // Try to find flags in the response that might indicate token types
-    const isArrayWithFreepayFlag = tokens.some((t: any) => 
+    const isArrayWithFreepayFlag = tokens.some((t: any) =>
       'freepay' in t || 'prepay' in t || 'postpay' in t
     );
-      
+
     if (isArrayWithFreepayFlag) {
       console.log("Detected payment type flags in token response");
     }
- 
+
     const mappedTokens = tokens.map((token: any) => {
       // Ensure token type is a valid number
       let tokenType = 1; // Default to type 1 (prepay)
-      
+
       // Check if this is from a response with prepay/postpay flags
       if ('freepay' in token || 'prepay' in token || 'postpay' in token) {
         if (token.freepay === true) {
@@ -743,7 +875,7 @@ export const getSupportedTokens = async (client: any, builder: any) => {
         } else if (token.postpay === true) {
           tokenType = 2; // Postpay
         }
-      } 
+      }
       // Try to parse the type if it exists
       else if (token.type !== undefined) {
         if (typeof token.type === 'number' && !isNaN(token.type)) {
@@ -755,7 +887,7 @@ export const getSupportedTokens = async (client: any, builder: any) => {
           }
         }
       }
-      
+
       // Create the token object with normalized properties
       return {
         address: token.token || token.address,
@@ -765,11 +897,11 @@ export const getSupportedTokens = async (client: any, builder: any) => {
         price: token.price ? parseFloat(token.price) : undefined,
         // Add the original flags for debugging and alternative filtering
         prepay: token.prepay === true,
-        postpay: token.postpay === true || token.prepay ===true,
+        postpay: token.postpay === true || token.prepay === true,
         freepay: token.freepay === true
       };
     });
- 
+
     console.log("Mapped tokens:", mappedTokens);
     return mappedTokens;
   } catch (error) {
