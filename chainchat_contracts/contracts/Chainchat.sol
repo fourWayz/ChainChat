@@ -8,41 +8,25 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract Chainchat is ReentrancyGuard, Ownable {
     IERC20 public ccToken;
 
-    /**
-     * @dev Struct representing a user in the dApp.
-     * @param username The username of the user.
-     * @param userAddress The address of the user.
-     * @param isRegistered A boolean indicating if the user is registered.
-     * @param profileImage The image URL or IPFS hash for the user's profile picture.
-     */
     struct User {
         string username;
         address userAddress;
+        address sender;
         bool isRegistered;
-        string profileImage; // New field: profile picture
+        string profileImage;
+        string bio;
+        string coverPhoto;
+         string[] interests;
     }
 
-    mapping(address => User) public users;
-
-    /**
-     * @dev Struct representing a post in the dApp.
-     * @param author The address of the user who created the post.
-     * @param content The content of the post.
-     * @param image The optional image URL or IPFS hash attached to the post.
-     * @param timestamp The time when the post was created.
-     * @param likes The number of likes the post has received.
-     * @param commentsCount The number of comments on the post.
-     * @param originalPostId The ID of the post being shared (0 for original posts).
-     * @param likedBy A mapping to track if a user has liked the post.
-     */
     struct Post {
         address author;
         string content;
-        string image; // New field: image URL or IPFS hash
+        string image;
         uint256 timestamp;
         uint256 likes;
         uint256 commentsCount;
-        uint256 originalPostId; // New field: shared post reference
+        uint256 originalPostId;
         mapping(address => bool) likedBy;
     }
 
@@ -52,22 +36,25 @@ contract Chainchat is ReentrancyGuard, Ownable {
         uint256 timestamp;
     }
 
-    // Token economics
-    uint256 public postCost = 10 * 10 ** 18; // 10 CCT
-    uint256 public commentCost = 5 * 10 ** 18; // 5 CCT
-    uint256 public signupBonus = 100 * 10 ** 18; // 100 CCT
-    uint256 public referralBonus = 50 * 10 ** 18; // 50 CCT
+    uint256 public postCost = 10 * 10 ** 18;
+    uint256 public commentCost = 5 * 10 ** 18;
+    uint256 public signupBonus = 100 * 10 ** 18;
+    uint256 public referralBonus = 50 * 10 ** 18;
+    string[] public interests;
 
-    // Free post allowance
-    uint256 constant FREE_POST_ALLOWANCE = 5;
+    mapping(address => User) public users;
+    mapping(address => address) public walletToCreator;
     mapping(address => uint256) public freePostsRemaining;
-
-    // User referrals
     mapping(address => address) public referrers;
     mapping(address => uint256) public referralCount;
-
     mapping(uint256 => mapping(uint256 => Comment)) public postComments;
     mapping(uint256 => uint256) public postCommentsCount;
+    mapping(address => string[]) public userInterests;
+
+    // Track user stats
+    mapping(address => uint256) public userPostCount;
+    mapping(address => uint256) public userLikeCount;
+    mapping(address => uint256) public userCommentCount;
 
     Post[] public posts;
 
@@ -93,7 +80,10 @@ contract Chainchat is ReentrancyGuard, Ownable {
     );
 
     modifier onlyRegisteredUser() {
-        require(users[msg.sender].isRegistered, "User is not registered");
+        require(
+            users[_getUserAddress()].isRegistered,
+            "User is not registered"
+        );
         _;
     }
 
@@ -102,42 +92,50 @@ contract Chainchat is ReentrancyGuard, Ownable {
         transferOwnership(msg.sender);
     }
 
-    function registerUser(string memory _username) external {
-        require(!users[msg.sender].isRegistered, "User is already registered");
+    function registerUser(address creator, string memory _username) external {
+        require(!users[creator].isRegistered, "User is already registered");
         require(bytes(_username).length > 0, "Username should not be empty");
 
-        users[msg.sender] = User({
+        users[creator] = User({
             username: _username,
-            userAddress: msg.sender,
+            userAddress: creator,
+            sender: msg.sender,
             isRegistered: true,
-            profileImage: ""
+            profileImage: "",
+            bio: "",
+            coverPhoto: "",
+             interests: new string[](0)
         });
 
-        // Give free post allowance
+        walletToCreator[msg.sender] = creator;
         freePostsRemaining[msg.sender] = FREE_POST_ALLOWANCE;
-        // Standard signup bonus
         ccToken.transfer(msg.sender, signupBonus);
-        emit UserRegistered(msg.sender, _username);
+
+        emit UserRegistered(creator, _username);
     }
 
-    /// @notice Sets or updates the user's profile picture
     function setProfileImage(string memory _image) external onlyRegisteredUser {
-        users[msg.sender].profileImage = _image;
-        emit ProfileImageUpdated(msg.sender, _image);
+        address user = _getUserAddress();
+        users[user].profileImage = _image;
+        emit ProfileImageUpdated(user, _image);
     }
 
-    function getUserByAddress(
-        address _userAddress
-    ) external view returns (User memory) {
-        require(users[_userAddress].isRegistered, "User not found");
-        return users[_userAddress];
+    function setBio(string memory _bio) external onlyRegisteredUser {
+        address user = _getUserAddress();
+        users[user].bio = _bio;
     }
 
-    /// @notice Creates a new post, optionally with an image
+    function setCoverPhoto(string memory _cover) external onlyRegisteredUser {
+        address user = _getUserAddress();
+        users[user].coverPhoto = _cover;
+    }
+
     function createPost(
         string memory _content,
         string memory _image
     ) external onlyRegisteredUser {
+        address user = _getUserAddress();
+
         if (freePostsRemaining[msg.sender] > 0) {
             freePostsRemaining[msg.sender]--;
         } else {
@@ -150,75 +148,86 @@ contract Chainchat is ReentrancyGuard, Ownable {
         require(bytes(_content).length > 0, "Content should not be empty");
 
         Post storage newPost = posts.push();
-        newPost.author = msg.sender;
+        newPost.author = user;
         newPost.content = _content;
         newPost.image = _image;
         newPost.timestamp = block.timestamp;
         newPost.originalPostId = 0;
+        userPostCount[user]++;
 
-        emit PostCreated(msg.sender, _content, _image, block.timestamp);
+        emit PostCreated(user, _content, _image, block.timestamp);
     }
 
-    /// @notice Shares an existing post
     function sharePost(uint256 _postId) external onlyRegisteredUser {
         require(_postId < posts.length, "Original post does not exist");
+        address user = _getUserAddress();
 
         Post storage sharedPost = posts.push();
-        sharedPost.author = msg.sender;
+        sharedPost.author = user;
         sharedPost.content = posts[_postId].content;
         sharedPost.image = posts[_postId].image;
         sharedPost.timestamp = block.timestamp;
         sharedPost.originalPostId = _postId;
 
-        emit PostShared(msg.sender, _postId, posts.length - 1);
+        emit PostShared(user, _postId, posts.length - 1);
     }
 
     function likePost(
         uint256 _postId
     ) external onlyRegisteredUser nonReentrant {
         require(_postId < posts.length, "Post does not exist");
+        address user = _getUserAddress();
 
         Post storage post = posts[_postId];
-        require(!post.likedBy[msg.sender], "User has already liked this post");
+        require(!post.likedBy[user], "User has already liked this post");
 
         post.likes++;
-        post.likedBy[msg.sender] = true;
+        userLikeCount[user]++;
+        post.likedBy[user] = true;
 
-        // Send 1 CCT to the post creator
         ccToken.transfer(post.author, 1 * 10 ** 18);
 
-        emit PostLiked(msg.sender, _postId);
+        emit PostLiked(user, _postId);
     }
 
     function addComment(
         uint256 _postId,
         string memory _content
     ) external onlyRegisteredUser nonReentrant {
-        require(
-            ccToken.transferFrom(msg.sender, address(this), commentCost),
-            "Payment failed"
-        );
         require(_postId < posts.length, "Post does not exist");
         require(bytes(_content).length > 0, "Comment should not be empty");
+        address user = _getUserAddress();
+
+        // require(
+        //     ccToken.transferFrom(msg.sender, address(this), commentCost),
+        //     "Payment failed"
+        // );
 
         uint256 commentId = postCommentsCount[_postId];
         postComments[_postId][commentId] = Comment({
-            commenter: msg.sender,
+            commenter: user,
             content: _content,
             timestamp: block.timestamp
         });
 
         postCommentsCount[_postId]++;
         posts[_postId].commentsCount++;
+        userCommentCount[user]++;
 
-        emit CommentAdded(msg.sender, _postId, _content, block.timestamp);
+        emit CommentAdded(user, _postId, _content, block.timestamp);
+    }
+
+    function getUserByAddress(
+        address _userAddress
+    ) external view returns (User memory) {
+        require(users[_userAddress].isRegistered, "User not found");
+        return users[_userAddress];
     }
 
     function getPostsCount() external view returns (uint256) {
         return posts.length;
     }
 
-    /// @notice Returns post data, including new image and originalPostId fields
     function getPost(
         uint256 _postId
     )
@@ -265,6 +274,22 @@ contract Chainchat is ReentrancyGuard, Ownable {
         return (comment.commenter, comment.content, comment.timestamp);
     }
 
+    function getFreePostsRemaining(
+        address _user
+    ) external view returns (uint256) {
+        return freePostsRemaining[_user];
+    }
+
+    function getUserStats(
+        address user
+    ) external view returns (uint256 posts, uint256 likes, uint256 comments) {
+        return (
+            userPostCount[user],
+            userLikeCount[user],
+            userCommentCount[user]
+        );
+    }
+
     function setTokenAddress(address _tokenAddress) external onlyOwner {
         ccToken = IERC20(_tokenAddress);
     }
@@ -281,9 +306,52 @@ contract Chainchat is ReentrancyGuard, Ownable {
         ccToken.transfer(owner(), ccToken.balanceOf(address(this)));
     }
 
-    function getFreePostsRemaining(
-        address _user
-    ) external view returns (uint256) {
-        return freePostsRemaining[_user];
+    function editProfile(
+        string memory _newUsername,
+        string memory _newProfileImage,
+        string memory _newBio,
+        string memory _newCoverImage,
+        string[] memory _newInterests
+    ) external onlyRegisteredUser {
+        address creator = walletToCreator[msg.sender];
+        require(bytes(_newUsername).length > 0, "Username cannot be empty");
+
+        User storage user = users[creator];
+        user.username = _newUsername;
+        user.profileImage = _newProfileImage;
+        user.bio = _newBio;
+        user.coverPhoto = _newCoverImage;
+        user.interests = _newInterests;
+
+        emit ProfileImageUpdated(creator, _newProfileImage);
+        // emit BioUpdated(creator, _newBio);
+        // emit CoverImageUpdated(creator, _newCoverImage);
+        // emit InterestsUpdated(creator, _newInterests);
     }
+
+    function setUserInterests(
+        string[] memory _interests
+    ) external onlyRegisteredUser {
+        address user = _getUserAddress();
+
+        delete userInterests[user];
+
+        for (uint256 i = 0; i < _interests.length; i++) {
+            userInterests[user].push(_interests[i]);
+        }
+    }
+
+    function getUserInterests(
+        address _user
+    ) external view returns (string[] memory) {
+        return userInterests[_user];
+    }
+
+    // 🧠 Utility to resolve real user identity
+    function _getUserAddress() internal view returns (address) {
+        address creator = walletToCreator[msg.sender];
+        return creator != address(0) ? creator : msg.sender;
+    }
+
+    uint256 constant FREE_POST_ALLOWANCE = 10;
 }

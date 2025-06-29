@@ -7,6 +7,8 @@ import { ToastContainer, toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import { formatEther } from "ethers/lib/utils";
 import axios from 'axios';
+import CHAINCHAT_ABI from '@/config/chainchat.json';
+
 
 // Components
 import ParticleBackground from "@/app/components/ParticleBackground";
@@ -35,8 +37,12 @@ import {
   getAAWalletAddress,
   UploadProfileImage,
   getBalance,
-  getFreePostRemaining
+  getFreePostRemaining,
+  getUserStats,
+  setCoverPhoto,
+  editUserProfile
 } from '@/utils/aautils';
+import { useWallets, useCreateWallet, usePrivy } from '@privy-io/react-auth';
 
 export default function SocialMediaApp() {
   const [username, setUsername] = useState('');
@@ -54,35 +60,69 @@ export default function SocialMediaApp() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'disconnected'>('idle');
   const [registrationKey, setRegistrationKey] = useState(0);
+  const [userStats, setUserStats] = useState<any>()
+  const { wallets } = useWallets();
+  const { authenticated } = usePrivy();
 
-  useEffect(() => {
-    if (signer) {
-      fetchPosts(signer);
-      getBalance(signer,aaAddress)
-      getRemainingFreePosts(signer,aaAddress)
-
-      // fetchRegisteredUser()
-      // setNeedsRefresh(false);
+  const { createWallet } = useCreateWallet({
+    onSuccess: ({ wallet }) => {
+      console.log('Created wallet ', wallet);
+    },
+    onError: (e) => {
+      console.error('Failed to create wallet with error ', e)
     }
-  }, [posts, signer]);
+  })
+
+  const privyWallet = wallets.find(w => w.walletClientType === 'privy');
+  useEffect(() => {
+    async function privyConnection() {
+      if (privyWallet && !signer) {
+        try {
+          const ethereumProvider = await privyWallet.getEthereumProvider();
+          const ethersProvider = new ethers.providers.Web3Provider(ethereumProvider);
+          setSigner(ethersProvider.getSigner());
+          setAaAddress(privyWallet.address);
+        } catch (error) {
+          console.error("Failed to initialize Privy signer:", error);
+        }
+      }
+    }
+
+    privyConnection()
+
+  }, [privyWallet, signer]);
+
+  // useEffect(() => {
+  //   if (signer) {
+  //     fetchPosts(signer);
+  //     getBalance(signer, aaAddress)
+  //     getRemainingFreePosts(signer, aaAddress)
+  //     fetchRegisteredUser()
+  //     getStats(signer,aaAddress)
+
+  //     // setNeedsRefresh(false);
+  //   }
+  // }, [posts, signer]);
 
   useEffect(() => {
     if (signer && aaAddress) {
       getUserByAddress(signer, aaAddress).then(user => {
+        // console.log(user)
         if (user) setRegisteredUser(user);
-        retrieveBalance(signer,aaAddress)
-        getRemainingFreePosts(signer,aaAddress)
+        retrieveBalance(signer, user.sender.toString())
+        getStats(signer, aaAddress)
+        getRemainingFreePosts(signer, aaAddress)
         fetchPosts(signer);
       });
     }
-  }, [signer, aaAddress, registrationKey])
+  }, [signer, aaAddress, registrationKey, userStats])
 
 
   useEffect(() => {
     // Check every 5 seconds if still connected but no user
     const interval = setInterval(() => {
       if (aaAddress && signer && !registeredUser) {
-        console.log('Periodic registration check...');
+        // console.log('Periodic registration check...');
         forceUserRefresh();
       }
     }, 5000);
@@ -90,13 +130,19 @@ export default function SocialMediaApp() {
     return () => clearInterval(interval);
   }, [aaAddress, signer, registeredUser]);
 
-  const retrieveBalance = async (signer:any, aaAddress:any)=>{
+  const retrieveBalance = async (signer: any, aaAddress: any) => {
     const balance = await getBalance(signer, aaAddress)
     setBalance(formatEther(balance.toString()))
   }
 
-  const getRemainingFreePosts = async(signer:any,aaAddress:any)=>{
-    const freepost = await getFreePostRemaining(signer,aaAddress)
+  const getStats = async (signer: any, aaAddress: any) => {
+    const stats = await getUserStats(signer, aaAddress)
+    setUserStats(stats)
+    // console.log(stats,'stats')
+  }
+
+  const getRemainingFreePosts = async (signer: any, aaAddress: any) => {
+    const freepost = await getFreePostRemaining(signer, aaAddress)
     setFreePosts(freepost.toNumber())
   }
 
@@ -149,7 +195,9 @@ export default function SocialMediaApp() {
         setConnectionState('connected');
 
       } catch (userError: any) {
-        // Special handling for "user not found" errors
+        setIsLoading(false);
+
+        // Special handling fjjor "user not found" errors
         if (userError.message.includes('User not found')) {
           console.log('New user detected - showing registration form');
           setRegisteredUser(null);
@@ -160,6 +208,7 @@ export default function SocialMediaApp() {
       }
 
     } catch (error) {
+      setIsLoading(false);
       console.error("Actual connection error:", error);
       setConnectionState('disconnected');
       setRegisteredUser(null);
@@ -213,6 +262,7 @@ export default function SocialMediaApp() {
       throw error;
     }
   };
+
   const setProfileImage = async (file: File) => {
     if (!signer) return;
     try {
@@ -225,15 +275,51 @@ export default function SocialMediaApp() {
     }
   };
 
+  const setUserProfile = async (
+  username: string,
+  profileImage: string,
+  bio: string,
+  coverPhoto: string,
+  interests: string[]
+) => {
+  if (!signer) return;
+  try {
+    await editUserProfile(
+      signer,
+      username,
+      profileImage,
+      bio,
+      coverPhoto,
+      interests
+    );
+    toast.success("User profile updated successfully");
+    await fetchRegisteredUser(); // refresh local state
+  } catch (err) {
+    console.error("Error updating user profile:", err);
+  }
+};
+
+
+  const setCoverImage = async (file: File) => {
+    if (!signer) return;
+    try {
+      const imageUrl = await uploadToPinata(file);
+      await setCoverPhoto(signer, imageUrl);
+      console.log("cover image set:", imageUrl);
+      await fetchRegisteredUser();
+    } catch (err) {
+      console.error("Error setting cover image", err);
+    }
+  };
+
 
 
   // Fetch user data
   const fetchRegisteredUser = async () => {
-    console.log('checkings')
+
     if (!signer || !aaAddress) return;
     try {
-      const user = await getUserByAddress(signer, '0x6158c3929EAC7beFe0Ae729b5f8E135010640181');
-      console.log(user, 'aa')
+      const user = await getUserByAddress(signer, aaAddress);
       setRegisteredUser(user || null);
     } catch (error) {
       setRegisteredUser(null);
@@ -263,32 +349,56 @@ export default function SocialMediaApp() {
 
       setPosts(fetchedPosts);
     } catch (error) {
+      setIsLoading(false);
+
       console.error("Failed to fetch posts:", error);
-      toast.error("Failed to load posts");
+      // toast.error("Failed to load posts");
     } finally {
       setIsLoading(false);
     }
   };
 
   // register user
-
   const register_user = async () => {
     try {
-      if (!signer) return;
-      setIsLoading(true)
-      const tx = await registerUser(signer, username);
+      if (!username.trim()) {
+        toast.error("Username cannot be empty");
+        return;
+      }
+
+      if (!signer && !authenticated) {
+        toast.error("Please connect a wallet first");
+        return;
+      }
+
+      setIsLoading(true);
+
+      //  createWallet()
+
+      const tx = await registerUser(signer!, aaAddress, username);
+
       if (tx.transactionHash) {
-        toast.success('Registered Successfully!')
+        toast.success('Registered Successfully!');
         forceUserRefresh();
       }
-      setIsLoading(false)
-    } catch (error: any) {
-      toast.error('Error registering!')
-      console.error(error);
-      setIsLoading(false)
 
+    } catch (error: any) {
+      console.error("Registration error:", error);
+
+      // Enhanced error messages
+      if (error.message.includes("User already registered")) {
+        toast.error("This username is already taken");
+      } else if (error.message.includes("rejected")) {
+        toast.error("Transaction was cancelled");
+      } else {
+        toast.error("Registration failed. Please try again");
+      }
+
+    } finally {
+      setIsLoading(false);
     }
   };
+
   const create_post = async (imageUrl?: string) => {
     try {
       if (!signer) return;
@@ -296,11 +406,11 @@ export default function SocialMediaApp() {
       const tx = await createPost(signer, content, imageUrl ?? "");
       await tx.transactionHash
       setNeedsRefresh(true);
-      setTimeout(()=>{
+      setTimeout(() => {
 
-      },7000)
+      }, 7000)
 
-        toast.success("Post created successfully!");
+      toast.success("Post created successfully!");
       setContent('');
       setIsLoading(false)
     } catch (error: any) {
@@ -312,14 +422,17 @@ export default function SocialMediaApp() {
   const like_post = async (postId: number) => {
     try {
       if (!signer) return;
+      setIsLoading(true)
       await likePost(signer, postId);
       setNeedsRefresh(true);
-        setTimeout(()=>{
+      setTimeout(() => {
 
-      },7000)
+      }, 7000)
       toast.success("Post liked!");
+      setIsLoading(false)
       await fetchPosts(signer);
     } catch (error: any) {
+      setIsLoading(false)
       console.error(error);
     }
   };
@@ -327,13 +440,16 @@ export default function SocialMediaApp() {
   const add_comment = async (postId: number, comment: string) => {
     try {
       if (!signer) return;
+      setIsLoading(true)
       await addComment(signer, postId, comment);
       setNeedsRefresh(true);
-        setTimeout(()=>{
+      setTimeout(() => {
 
-      },7000)
+      }, 7000)
       toast.success("Comment added!");
+      setIsLoading(false)
     } catch (error: any) {
+      setIsLoading(false)
       console.error(error);
     }
   };
@@ -400,7 +516,7 @@ export default function SocialMediaApp() {
               setUsername={setUsername}
               registerUser={register_user}
               isLoading={isLoading}
-              isWalletConnected={connectionState === 'connected'}
+              isWalletConnected={connectionState === 'connected' || authenticated}
             />
           </motion.div>
         )}
@@ -417,8 +533,14 @@ export default function SocialMediaApp() {
                 address: registeredUser.userAddress,
                 profileImage: registeredUser.profileImage,
                 balance,
+                userStats,
+                bio: registeredUser.bio,
+                coverPhoto: registeredUser.coverPhoto,
+                interests: registeredUser.interests
               }}
               onSetProfileImage={setProfileImage}
+              onSetCoverPhoto={setCoverImage}
+              onUpdateProfile={setUserProfile}
             />
           </motion.div>
         )}
@@ -478,6 +600,7 @@ export default function SocialMediaApp() {
                       isRegistered={!!registeredUser}
                       signer={signer}
                       getUserByAddress={getUserByAddress}
+                      loading={isLoading}
                     />
                   );
                 })}

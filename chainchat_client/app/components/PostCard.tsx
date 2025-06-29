@@ -38,7 +38,8 @@ interface PostCardProps {
   onShare: (postId: number) => Promise<void>;
   isRegistered: boolean;
   getUserByAddress: (signer : any, address: string) => Promise<UserProfile>;
-  signer :any
+  signer :any,
+  loading : boolean
 }
 const PostCard: React.FC<PostCardProps> = ({ 
   post, 
@@ -47,7 +48,8 @@ const PostCard: React.FC<PostCardProps> = ({
   onShare, 
   isRegistered,
   getUserByAddress,
-  signer
+  signer,
+  loading
 }) => {
   const [showComments, setShowComments] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
@@ -185,6 +187,7 @@ const [authorProfile, setAuthorProfile] = useState<UserProfile | null>(null);
           postId={post.id}
           onAddComment={onComment}
           isRegistered={isRegistered}
+          loading
         />
       )}
     </motion.div>

@@ -1,4 +1,4 @@
- [
+[
     {
       "inputs": [
         {
@@ -265,6 +265,39 @@
     {
       "inputs": [
         {
+          "internalType": "string",
+          "name": "_newUsername",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_newProfileImage",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_newBio",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_newCoverImage",
+          "type": "string"
+        },
+        {
+          "internalType": "string[]",
+          "name": "_newInterests",
+          "type": "string[]"
+        }
+      ],
+      "name": "editProfile",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "address",
           "name": "",
           "type": "address"
@@ -419,6 +452,11 @@
               "type": "address"
             },
             {
+              "internalType": "address",
+              "name": "sender",
+              "type": "address"
+            },
+            {
               "internalType": "bool",
               "name": "isRegistered",
               "type": "bool"
@@ -427,11 +465,93 @@
               "internalType": "string",
               "name": "profileImage",
               "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "bio",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "coverPhoto",
+              "type": "string"
+            },
+            {
+              "internalType": "string[]",
+              "name": "interests",
+              "type": "string[]"
             }
           ],
           "internalType": "struct Chainchat.User",
           "name": "",
           "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_user",
+          "type": "address"
+        }
+      ],
+      "name": "getUserInterests",
+      "outputs": [
+        {
+          "internalType": "string[]",
+          "name": "",
+          "type": "string[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getUserStats",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "posts",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "likes",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "comments",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "interests",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
         }
       ],
       "stateMutability": "view",
@@ -632,6 +752,11 @@
     {
       "inputs": [
         {
+          "internalType": "address",
+          "name": "creator",
+          "type": "address"
+        },
+        {
           "internalType": "string",
           "name": "_username",
           "type": "string"
@@ -645,6 +770,19 @@
     {
       "inputs": [],
       "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_bio",
+          "type": "string"
+        }
+      ],
+      "name": "setBio",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -671,6 +809,19 @@
       "inputs": [
         {
           "internalType": "string",
+          "name": "_cover",
+          "type": "string"
+        }
+      ],
+      "name": "setCoverPhoto",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
           "name": "_image",
           "type": "string"
         }
@@ -689,6 +840,19 @@
         }
       ],
       "name": "setTokenAddress",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string[]",
+          "name": "_interests",
+          "type": "string[]"
+        }
+      ],
+      "name": "setUserInterests",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -740,6 +904,87 @@
           "type": "address"
         }
       ],
+      "name": "userCommentCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "userInterests",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "userLikeCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "userPostCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
       "name": "users",
       "outputs": [
         {
@@ -753,6 +998,11 @@
           "type": "address"
         },
         {
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        },
+        {
           "internalType": "bool",
           "name": "isRegistered",
           "type": "bool"
@@ -761,6 +1011,35 @@
           "internalType": "string",
           "name": "profileImage",
           "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "bio",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "coverPhoto",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "walletToCreator",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
         }
       ],
       "stateMutability": "view",
