@@ -1,6 +1,6 @@
 "use client"
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FiLogIn, FiLogOut, FiCopy, FiCheck, FiUser } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import { usePrivy, useWallets, useCreateWallet } from '@privy-io/react-auth';
@@ -25,6 +25,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
   const [copied, setCopied] = useState(false);
   const [showWalletMenu, setShowWalletMenu] = useState(false);
   const { login, logout, user,authenticated,ready  } = usePrivy();
+  const [isLoaded , setIsloaded] = useState(false);
   const { wallets } = useWallets()
   const {createWallet} = useCreateWallet({
     onSuccess: ({wallet}) => {
@@ -48,9 +49,22 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  useEffect(() => {
+    if (!ready) return; // Wait for Privy to be ready
+    //check localStorage for loggedIn status
+    const loggedIn = localStorage.getItem('loggedIn') === 'true';
+    
+    if (authenticated && !loggedIn) {
+      localStorage.setItem('loggedIn', 'true');
+      //refresh page to ensure user data is up-to-date
+      window.location.reload();
+    }
+  }, [authenticated]);
+
 const signIn = async () => {
   try {
     if (!authenticated) {
+      localStorage.removeItem('loggedIn'); // Clear loggedIn status
       login();
       // Wait for user to be populated
       // await new Promise((resolve) => {
@@ -60,7 +74,7 @@ const signIn = async () => {
       //   };
       //   checkUser();
       // });
-      await createWallet();
+      //  createWallet();
     }
   } catch (err) {
     console.error(err);
